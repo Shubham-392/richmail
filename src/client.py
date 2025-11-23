@@ -21,17 +21,17 @@ def run_client():
             # receive message from the server
             response = client.recv(1024)
             response = response.decode("utf-8")
+            print(f"{response}")
+            splittedResponse = response.split(" ")
 
-            # if server sent us "closed" in the payload, we break out of
-            # the loop and close our socket
-            if response.lower() == "closed":
+            closeCode = 221
+
+            if int(splittedResponse[0]) == closeCode:
                 break
 
-            print(f"{response}")
 
-            dataResponse = response.split(" ")
             successDataCode = 354
-            if int(dataResponse[0]) == int(f'{successDataCode}'):
+            if int(splittedResponse[0]) == int(f'{successDataCode}'):
                 print("start your msg now :)")
                 while True:
                     dataLine = input("")

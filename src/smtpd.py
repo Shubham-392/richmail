@@ -10,7 +10,8 @@ class CommandSpecifier:
         "EHLO",
         "MAIL",
         "RCPT",
-        "DATA"
+        "DATA",
+        "QUIT"
     ]
 
     def __init__(self, COMMAND: str):
