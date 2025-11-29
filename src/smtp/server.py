@@ -2,7 +2,8 @@ import socket
 
 from email_validator import EmailNotValidError, validate_email
 
-from src.smtpd import CommandSpecifier
+from src.smtp.smtpd import CommandSpecifier
+from src.smtp.db.db_config import conn
 
 version = "1.0.0"
 softwareAndVersion = f"richmail {version}"
@@ -16,11 +17,14 @@ stateIndependentCommands = ["NOOP", "HELP", "EXPN", "VRFY", "RSET"]
 class QuitLoopException(Exception):
     pass
 
+class SMTPTimeoutError(Exception):
+    pass
+
 
 class ESMTPServer:
-    # {"command":"command_DONE"}
-    transcationState = "INIT"
 
+    transcationState = "INIT"
+    # {"command":"command_DONE"}
     preCommandStates = {
         "EHLO": "EHLO_DONE",
         "MAIL": "MAIL_DONE",
@@ -30,7 +34,7 @@ class ESMTPServer:
 
     mailTranscationObjs = [
         "senderMail",  # only one is strictly allowed
-        "recipientMail",  # can be more than one recipient mails with RCPT command
+        "recipientMail",  # can be more than one recipient (atmost 100) mails with RCPT command
         "dataBuffer",  # message body of mail
     ]
 
@@ -47,6 +51,9 @@ class ESMTPServer:
         greeting = greeting.encode(encoding="utf-8")
         return greeting
 
+    def timeout_raise(self):
+        raise SMTPTimeoutError("Client did not respond in time")
+
     def run(self, HOST="127.0.0.1", PORT=2525):
         with socket.socket(self.addressFamily, self.stream) as server:
             server.bind((HOST, PORT))
@@ -54,11 +61,15 @@ class ESMTPServer:
             server.listen(0)
             clientSocket, clientAddress = server.accept()
             with clientSocket:
-                greeting = self.sendGreet()
-                clientSocket.send(greeting)
-                try:
 
+                try:
+                    greeting = self.sendGreet()
+                    clientSocket.send(greeting)
+                    # set timeout after sending greeting and
+                    #  waiting for the next command
+                    # clientSocket.settimeout(10)
                     while True:
+
                         request = clientSocket.recv(2**10)
                         request = request.decode(encoding="utf-8")
 
@@ -74,9 +85,11 @@ class ESMTPServer:
                             commandChunk = commandChunk,
                             connSocket = clientSocket
                     )
+
+                # except socket.timeout:
+                #     pass
                 except QuitLoopException:
                     pass
-
 
     def CommandHandler(
         self,
@@ -118,14 +131,14 @@ class ESMTPServer:
             errorMsg = command
             connSocket.send(errorMsg.encode("utf-8"))
 
-
     def EhloCmdHandler(self,
         command:str,
         commandTokens:dict,
         connSocket:socket.socket,
-        timeout:int= 0,
+        timeout:int= 10,
 
     ):
+
         if len(commandTokens) != 2:
             self.SendError(errorCode=501, clientSocket=connSocket)
 
@@ -136,8 +149,9 @@ class ESMTPServer:
         command:str,
         commandTokens:dict,
         connSocket: socket.socket,
-        timeout:int = 5,
+        timeout:int = 10,
     ):
+
         if len(commandTokens) != 3:
             self.SendError(errorCode = 555, clientSocket = connSocket)
         else:
@@ -250,7 +264,6 @@ class ESMTPServer:
         else:
             self.SendError(errorCode=503, clientSocket=connSocket)
 
-
     def DataCmdHandler(self,
         command:str,
         commandTokens:dict,
@@ -296,6 +309,12 @@ class ESMTPServer:
 
                 print(self.mailTranscation)
 
+                self.Insert(
+                    sender = self.mailTranscation[self.mailTranscationObjs[0]],
+                    receiver = self.mailTranscation[self.mailTranscationObjs[1]],
+                    data = self.mailTranscation[self.mailTranscationObjs[2]],
+                )
+
                 # clear all the buffers for next transcation
                 self.mailTranscation = {}
                 self.SendSuccess(successCode=250, clientSocket=connSocket)
@@ -313,6 +332,7 @@ class ESMTPServer:
         # send response to the client which acknowledges that the
         # connection should be closed and break out of the loop
         if len(commandTokens) != 1:
+
             self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
@@ -323,8 +343,12 @@ class ESMTPServer:
 
     def SendError(self, errorCode:int, clientSocket:socket.socket):
 
-        if errorCode == 455:
+        if errorCode == 421:
             errorMsg = f"{errorCode} Server unable to accommodate parameters"
+            clientSocket.send(errorMsg.encode("utf-8"))
+
+        if errorCode == 455:
+            errorMsg = f"{errorCode} Closing transmission channel "
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 500:
@@ -367,6 +391,24 @@ class ESMTPServer:
 
     def UpdateState(self, command:str):
         self.transcationState = self.preCommandStates[command]
+
+    def Insert(self,
+        sender,
+        receiver,
+        data
+    ):
+        add_mail = ("INSERT INTO setu_outbox"
+                    "(sender, receiver, data)"
+                    "VALUES (%s, %s, %s)")
+        mail_info = (sender, receiver[-1], data)
+
+        with  conn.connect() as cnx:
+            conn_cursor = cnx.cursor()
+            conn_cursor.execute(
+                add_mail, mail_info
+            )
+            cnx.commit()
+            conn_cursor.close()
 
 if __name__ == "__main__":
     richmail = ESMTPServer()

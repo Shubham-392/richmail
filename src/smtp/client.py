@@ -13,6 +13,7 @@ def run_client():
     try:
         greeting = client.recv(1024)  # Read the server's greeting
         print(greeting.decode('utf-8'))
+
         while True:
             # get input message from user and send it to the server
             msg = input("")
@@ -20,6 +21,9 @@ def run_client():
 
             # receive message from the server
             response = client.recv(1024)
+            if not response:
+                print('servre closed unexpected!')
+                break
             response = response.decode("utf-8")
             print(f"{response}")
             splittedResponse = response.split(" ")
