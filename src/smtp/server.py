@@ -1,4 +1,6 @@
 import socket
+import mysql.connector
+from mysql.connector import errorcode
 
 from email_validator import EmailNotValidError, validate_email
 
@@ -332,7 +334,6 @@ class ESMTPServer:
         # send response to the client which acknowledges that the
         # connection should be closed and break out of the loop
         if len(commandTokens) != 1:
-
             self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
@@ -397,18 +398,34 @@ class ESMTPServer:
         receiver,
         data
     ):
-        add_mail = ("INSERT INTO setu_outbox"
-                    "(sender, receiver, data)"
-                    "VALUES (%s, %s, %s)")
-        mail_info = (sender, receiver[-1], data)
+        add_mail = (
+            "INSERT INTO setu_outbox"
+            "(sender, receiver, data)"
+            "VALUES "
+        )
+        receiverList = len(receiver)
+        for recv in range(receiverList):
+            if recv < (receiverList - 1):
+                add_mail += f"('{sender}', '{receiver[recv]}', '{data}'),"
+            else:
+                add_mail += f"('{sender}', '{recv}', '{data}')"
 
-        with  conn.connect() as cnx:
-            conn_cursor = cnx.cursor()
-            conn_cursor.execute(
-                add_mail, mail_info
-            )
-            cnx.commit()
-            conn_cursor.close()
+        try:
+            with  conn.connect() as cnx:
+                conn_cursor = cnx.cursor()
+                conn_cursor.execute(
+                    add_mail
+                )
+                cnx.commit()
+                conn_cursor.close()
+
+        except mysql.connector.ProgrammingError as err:
+          if err.errno == errorcode.ER_SYNTAX_ERROR:
+            print("Check your syntax!")
+          else:
+            print("Error: {}".format(err))
+        except Exception as error:
+            print("ERROR: ", str(error))
 
 if __name__ == "__main__":
     richmail = ESMTPServer()

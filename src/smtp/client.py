@@ -36,7 +36,6 @@ def run_client():
 
             successDataCode = 354
             if int(splittedResponse[0]) == int(f'{successDataCode}'):
-                print("start your msg now :)")
                 while True:
                     dataLine = input("")
                     if dataLine == ".":
@@ -57,7 +56,6 @@ def run_client():
     finally:
         # close client socket (connection to the server)
         client.close()
-        print("Connection to server closed")
 
 
 run_client()
