@@ -258,7 +258,16 @@ class ESMTPServer:
         command:str,
         forwardPath:str,
         connSocket: socket.socket,
+        recipentsLimit:int = 100,
     ):
+        recipientsListKey = self.mailTranscationObjs[1]
+        if recipientsListKey in self.mailTranscation:
+            recipientsList = self.mailTranscation[self.mailTranscationObjs[1]]
+            # check if recipient list is full
+            if len(recipientsList) >= recipentsLimit :
+                self.SendError(errorCode=452, clientSocket=connSocket)
+                return   # don't process ideally after temporary error
+
         if (forwardPath.startswith("<")) and (
             forwardPath.endswith(">")
         ):
@@ -277,15 +286,15 @@ class ESMTPServer:
                     )
 
                     if (
-                        self.mailTranscationObjs[1]
+                        recipientsListKey
                         not in self.mailTranscation
                     ):
                         self.mailTranscation[
-                            self.mailTranscationObjs[1]
+                            recipientsListKey
                         ] = [normalizedRecipientAddress]
                     else:
                         self.mailTranscation[
-                            self.mailTranscationObjs[1]
+                            recipientsListKey
                         ].append(normalizedRecipientAddress)
 
                     print(
