@@ -50,7 +50,7 @@ class ESMTPServer:
 
     def sendGreet(self, greetCode=220, softwareAndVersion=softwareAndVersion) -> bytes:
         """return greeting in bytes"""
-        greeting = f"{greetCode} {softwareAndVersion} Service ready"
+        greeting = f"{greetCode} {softwareAndVersion} Service ready\r\n"
         greeting = greeting.encode(encoding="utf-8")
         return greeting
 
@@ -87,8 +87,6 @@ class ESMTPServer:
                             connSocket=clientSocket,
                         )
 
-                # except socket.timeout:
-                #     pass
                 except QuitLoopException:
                     pass
 
@@ -139,52 +137,81 @@ class ESMTPServer:
         connSocket: socket.socket,
         timeout: int = 10,
     ):
-        if len(commandTokens) != 3:
-            self.SendError(errorCode=555, clientSocket=connSocket)
-        else:
+        commandTokensCount= len(commandTokens)
+
+        if commandTokensCount == 2:
+            normalizedCommandToken = commandTokens[1].lower()
+            if normalizedCommandToken.startswith("from:"):
+                reversePath = normalizedCommandToken[len("from:"):]
+                self.HandleReversePath(
+                    command=command,
+                    reversePath=reversePath,
+                    connSocket=connSocket
+                )
+            else:
+                self.SendError(errorCode=555, clientSocket=connSocket)
+        elif commandTokensCount == 3:
             if (commandTokens[1].lower()) != "from:":
                 self.SendError(errorCode=555, clientSocket=connSocket)
             else:
-                senderMailAddress = commandTokens[2]
-                if (senderMailAddress.startswith("<")) and (
-                    senderMailAddress.endswith(">")
-                ):
-                    senderMailAddress = senderMailAddress[1:-1]
+                self.HandleReversePath(
+                    command=command,
+                    reversePath=commandTokens[2],
+                    connSocket=connSocket
+                )
+        else:
+            self.SendError(errorCode=555, clientSocket=connSocket)
 
-                    if senderMailAddress:
-                        try:
-                            validSenderAddress = validate_email(
-                                senderMailAddress,
-                                check_deliverability=True,
-                            )
 
-                            print(f"{validSenderAddress.normalized}")
-                            # normalise email for session use
-                            normalizedSenderAddress = validSenderAddress.normalized
+    def HandleReversePath(
+        self,
+        command:str,
+        reversePath:str,
+        connSocket: socket.socket,
+    ):
+        if (reversePath.startswith("<")) and (
+            reversePath.endswith(">")
+        ):
+            senderMailAddress = reversePath[1:-1]
 
-                            # start the session
-                            if (
-                                self.mailTranscationObjs[0]
-                                not in self.mailTranscation.keys()
-                            ):
-                                self.mailTranscation[self.mailTranscationObjs[0]] = (
-                                    normalizedSenderAddress
-                                )
+            if senderMailAddress:
+                try:
+                    validSenderAddress = validate_email(
+                        senderMailAddress,
+                        check_deliverability=True,
+                    )
 
-                            # send SMTP reply and after initializing the transcation
-                            self.SendSuccess(successCode=250, clientSocket=connSocket)
+                    print(f"{validSenderAddress.normalized}")
+                    # normalise email for session use
+                    normalizedSenderAddress = validSenderAddress.normalized
 
-                            # update the transcation state for the next command in series
-                            self.UpdateState(command=command)
+                    # start the session
+                    if (
+                        self.mailTranscationObjs[0]
+                        not in self.mailTranscation.keys()
+                    ):
+                        self.mailTranscation[self.mailTranscationObjs[0]] = (
+                            normalizedSenderAddress
+                        )
 
-                        except EmailNotValidError:
-                            self.SendError(errorCode=550, clientSocket=connSocket)
+                    # send SMTP reply and after initializing the transcation
+                    self.SendSuccess(successCode=250, clientSocket=connSocket)
 
-                        except Exception:
-                            self.SendError(errorCode=550, clientSocket=connSocket)
+                    # update the transcation state for the next command in series
+                    self.UpdateState(command=command)
 
-                    else:
-                        self.SendError(errorCode=553, clientSocket=connSocket)
+                except EmailNotValidError:
+                    self.SendError(errorCode=550, clientSocket=connSocket)
+
+                except Exception:
+                    self.SendError(errorCode=550, clientSocket=connSocket)
+
+            else:
+                self.SendError(errorCode=553, clientSocket=connSocket)
+        else:
+            self.SendError(errorCode=555, clientSocket=connSocket)
+
+
 
     def RcptCmdHandler(
         self,
@@ -196,61 +223,91 @@ class ESMTPServer:
         if (self.transcationState == self.preCommandStates["MAIL"]) or (
             self.mailTranscationObjs[1] in self.mailTranscation
         ):
-            if len(commandTokens) != 3:
-                self.SendError(errorCode=500, clientSocket=connSocket)
-            else:
-                if (commandTokens[1].lower()) != "to:":
-                    self.SendError(errorCode=500, clientSocket=connSocket)
+            commandTokensCount = len(commandTokens)
+            if commandTokensCount == 2:
+                normalizedCommandToken = commandTokens[1].lower()
+                if normalizedCommandToken.startswith("to:"):
+                    forwardPath = normalizedCommandToken[len("to:"):]
+                    self.HandleForwardPath(
+                        command=command,
+                        forwardPath=forwardPath,
+                        connSocket=connSocket
+                    )
                 else:
-                    recipientMailAddress = commandTokens[2]
-                    if (recipientMailAddress.startswith("<")) and (
-                        recipientMailAddress.endswith(">")
-                    ):
-                        recipientMailAddress = recipientMailAddress[1:-1]
+                    self.SendError(errorCode=501, clientSocket=connSocket)
+            elif commandTokensCount == 3:
+                if (commandTokens[1].lower()) != "to:":
+                    self.SendError(errorCode=555, clientSocket=connSocket)
+                else:
+                    forwardPath = commandTokens[2]
+                    self.HandleForwardPath(
+                        command=command,
+                        forwardPath=forwardPath,
+                        connSocket=connSocket
+                    )
+            else:
+                self.SendError(errorCode=555, clientSocket=connSocket)
 
-                        if recipientMailAddress:
-                            try:
-                                validRecipientAddress = validate_email(
-                                    recipientMailAddress,
-                                    check_deliverability=True,
-                                )
-
-                                print(f"{validRecipientAddress.normalized}")
-                                normalizedRecipientAddress = (
-                                    validRecipientAddress.normalized
-                                )
-
-                                if (
-                                    self.mailTranscationObjs[1]
-                                    not in self.mailTranscation
-                                ):
-                                    self.mailTranscation[
-                                        self.mailTranscationObjs[1]
-                                    ] = [normalizedRecipientAddress]
-                                else:
-                                    self.mailTranscation[
-                                        self.mailTranscationObjs[1]
-                                    ].append(normalizedRecipientAddress)
-
-                                print(
-                                    f"Transcation Session Detail:{self.mailTranscation}"
-                                )
-                                self.SendSuccess(
-                                    successCode=250, clientSocket=connSocket
-                                )
-
-                                self.UpdateState(command=command)
-
-                            except EmailNotValidError:
-                                self.SendError(errorCode=550, clientSocket=connSocket)
-
-                            except Exception:
-                                self.SendError(errorCode=550, clientSocket=connSocket)
-                        else:
-                            self.SendError(errorCode=553, clientSocket=connSocket)
 
         else:
             self.SendError(errorCode=503, clientSocket=connSocket)
+
+
+    def HandleForwardPath(
+        self,
+        command:str,
+        forwardPath:str,
+        connSocket: socket.socket,
+    ):
+        if (forwardPath.startswith("<")) and (
+            forwardPath.endswith(">")
+        ):
+            recipientMailAddress = forwardPath[1:-1]
+
+            if recipientMailAddress:
+                try:
+                    validRecipientAddress = validate_email(
+                        recipientMailAddress,
+                        check_deliverability=True,
+                    )
+
+                    print(f"{validRecipientAddress.normalized}")
+                    normalizedRecipientAddress = (
+                        validRecipientAddress.normalized
+                    )
+
+                    if (
+                        self.mailTranscationObjs[1]
+                        not in self.mailTranscation
+                    ):
+                        self.mailTranscation[
+                            self.mailTranscationObjs[1]
+                        ] = [normalizedRecipientAddress]
+                    else:
+                        self.mailTranscation[
+                            self.mailTranscationObjs[1]
+                        ].append(normalizedRecipientAddress)
+
+                    print(
+                        f"Transcation Session Detail:{self.mailTranscation}"
+                    )
+                    self.SendSuccess(
+                        successCode=250, clientSocket=connSocket
+                    )
+
+                    self.UpdateState(command=command)
+
+                except EmailNotValidError:
+                    self.SendError(errorCode=550, clientSocket=connSocket)
+
+                except Exception:
+                    self.SendError(errorCode=550, clientSocket=connSocket)
+            else:
+                self.SendError(errorCode=553, clientSocket=connSocket)
+
+        else:
+            self.SendError(errorCode=501, clientSocket=connSocket)
+
 
     def DataCmdHandler(
         self,
@@ -260,41 +317,35 @@ class ESMTPServer:
         timeout: int = 10,
     ):
         if self.transcationState == self.preCommandStates["RCPT"]:
-            DataCommandBuffer = ""
             if len(commandTokens) != 1:
                 self.SendError(errorCode=455, clientSocket=connSocket)
             else:
                 self.SendSuccess(successCode=354, clientSocket=connSocket)
-
                 self.UpdateState(command=command)
-                print(f"Transcation State:{self.transcationState}")
 
+                DataCommandBuffer = ""
+                receiveBuffer = ""  # buffer for incomplete lines
                 notDataCommandEnd = True
+
                 while notDataCommandEnd:
-                    # Receive every line from Data Command loop before <CRLF>.<CRLF>
-                    DataLineWithCrlf = connSocket.recv(2**10)
-                    DataLineWithCrlf = DataLineWithCrlf.decode(encoding="utf-8")
-                    # extract text before CRLF
-                    cleanDataLineWithCrlf = DataLineWithCrlf.strip()
+                    chunk = connSocket.recv(2**10)
+                    chunk = chunk.decode(encoding="utf-8")
+                    receiveBuffer += chunk
 
-                    if cleanDataLineWithCrlf == ".":
-                        # break DATA input lines and
-                        # enter in transmission channel for next command
-                        print(f"{DataCommandBuffer}")
-                        notDataCommandEnd = False
+                    # process complete lines (split by \r\n)
+                    while "\r\n" in receiveBuffer:
+                        line, receiveBuffer = receiveBuffer.split("\r\n", 1)
 
-                    else:
-                        # update data-buffer after receiving every line
-                        DataCommandBuffer += f"{str(cleanDataLineWithCrlf)}\n"
+                        # check for end of data
+                        if line == ".":
+                            notDataCommandEnd = False
+                            break
 
-                if self.mailTranscationObjs[2] not in self.mailTranscation:
-                    self.mailTranscation[self.mailTranscationObjs[2]] = (
-                        DataCommandBuffer
-                    )
-                else:
-                    self.mailTranscation[self.mailTranscationObjs[2]] = (
-                        DataCommandBuffer
-                    )
+                        # add line to buffer
+                        DataCommandBuffer += line + "\n"
+
+                # store in transaction
+                self.mailTranscation[self.mailTranscationObjs[2]] = DataCommandBuffer
 
                 print(self.mailTranscation)
 
@@ -304,10 +355,9 @@ class ESMTPServer:
                     data=self.mailTranscation[self.mailTranscationObjs[2]],
                 )
 
-                # clear all the buffers for next transcation
+                # clear buffers for next transaction
                 self.mailTranscation = {}
                 self.SendSuccess(successCode=250, clientSocket=connSocket)
-
         else:
             self.SendError(errorCode=503, clientSocket=connSocket)
 
@@ -325,50 +375,51 @@ class ESMTPServer:
 
     def SendError(self, errorCode: int, clientSocket: socket.socket):
         if errorCode == 421:
-            errorMsg = f"{errorCode} Server unable to accommodate parameters"
+            errorMsg = f"{errorCode} Server unable to accommodate parameters\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 455:
-            errorMsg = f"{errorCode} Closing transmission channel "
+            errorMsg = f"{errorCode} Closing transmission channel\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 500:
-            errorMsg = f"{errorCode} Syntax error, command unrecognized"
+            errorMsg = f"{errorCode} Syntax error, command unrecognized\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 501:
-            errorMsg = f"{errorCode} Syntax error in parameters or arguments"
+            errorMsg = f"{errorCode} Syntax error in parameters or arguments\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 503:
-            errorMsg = f"{errorCode} Bad sequence of command(s)"
+            errorMsg = f"{errorCode} Bad sequence of command(s)\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 550:
-            errorMsg = f"{errorCode} Requested action not taken: mailbox unavailable"
+            errorMsg = f"{errorCode} Requested action not taken: mailbox unavailable\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 553:
             errorMsg = (
-                f"{errorCode} Requested action not taken: mailbox name not allowed"
+                f"{errorCode} Requested action not taken: mailbox name not allowed\r\n"
             )
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 555:
-            errorMsg = f"{errorCode} Syntax error, command unrecognized"
+            # syntax error in command
+            errorMsg = f"{errorCode} Syntax error, command unrecognized\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
     def SendSuccess(self, successCode: int, clientSocket: socket.socket):
         if successCode == 221:
-            successMsg = f"{successCode} OK Closing transmission channel"
+            successMsg = f"{successCode} OK Closing transmission channel\r\n"
             clientSocket.send(successMsg.encode("utf-8"))
 
         if successCode == 250:
-            successMsg = f"{successCode} OK Requested mail action okay, completed"
+            successMsg = f"{successCode} OK Requested mail action okay, completed\r\n"
             clientSocket.send(successMsg.encode("utf-8"))
 
         if successCode == 354:
-            successMsg = f"{successCode} Start mail input; end with <CRLF>.<CRLF>"
+            successMsg = f"{successCode} Start mail input; end with <CRLF>.<CRLF>\r\n"
             clientSocket.send(successMsg.encode("utf-8"))
 
     def UpdateState(self, command: str):

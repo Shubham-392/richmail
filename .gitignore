@@ -8,6 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+test_client.py
 
 # environments
 .env
