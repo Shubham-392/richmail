@@ -341,6 +341,10 @@ class ESMTPServer:
                             notDataCommandEnd = False
                             break
 
+                        # check for dot stuffing (transparency): removing leading dot
+                        elif  line.startswith("."):
+                            line = line[len("."):]
+
                         # add line to buffer
                         DataCommandBuffer += line + "\n"
 
@@ -370,16 +374,16 @@ class ESMTPServer:
             self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
-            self.SendSuccess(successCode=221, clientSocket=connSocket)
+            self.SendError(errorCode=421, clientSocket=connSocket)
             raise QuitLoopException
 
     def SendError(self, errorCode: int, clientSocket: socket.socket):
         if errorCode == 421:
-            errorMsg = f"{errorCode} Server unable to accommodate parameters\r\n"
+            errorMsg = f"{errorCode} OK Closing transmission channel\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 455:
-            errorMsg = f"{errorCode} Closing transmission channel\r\n"
+            errorMsg = f"{errorCode} Server unable to accommodate parameters\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 500:
@@ -410,10 +414,6 @@ class ESMTPServer:
             clientSocket.send(errorMsg.encode("utf-8"))
 
     def SendSuccess(self, successCode: int, clientSocket: socket.socket):
-        if successCode == 221:
-            successMsg = f"{successCode} OK Closing transmission channel\r\n"
-            clientSocket.send(successMsg.encode("utf-8"))
-
         if successCode == 250:
             successMsg = f"{successCode} OK Requested mail action okay, completed\r\n"
             clientSocket.send(successMsg.encode("utf-8"))
