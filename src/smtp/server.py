@@ -6,6 +6,12 @@ from mysql.connector import errorcode
 
 from src.smtp.db.config import conn
 from src.smtp.smtpd import CommandSpecifier
+from src.smtp.log_hierarchy import transc
+from src.smtp.transc_log import setup_logger
+
+# Setup logging module 'transcations'
+log_file = transc.create_log()
+logger = setup_logger(log_filepath=log_file)
 
 version = "1.0.0"
 softwareAndVersion = f"richmail {version}"
@@ -25,7 +31,10 @@ class SMTPTimeoutError(Exception):
     pass
 
 
+
 class ESMTPServer:
+    # Recipients Limit
+    RECIPIENTS_LIMIT:int = 100
     transcationState = "INIT"
     # {"command":"command_DONE"}
     preCommandStates = {
@@ -58,15 +67,20 @@ class ESMTPServer:
         raise SMTPTimeoutError("Client did not respond in time")
 
     def run(self, HOST="127.0.0.1", PORT=2525):
+        logger.info(f"Starting server on {HOST}:{PORT}")
         with socket.socket(self.addressFamily, self.stream) as server:
+            logger.debug("Connection Socket is created")
             server.bind((HOST, PORT))
             # listen for one incoming connections
             server.listen(0)
+
             clientSocket, clientAddress = server.accept()
+            logger.debug(f"Connected to client {clientAddress} ")
             with clientSocket:
                 try:
                     greeting = self.sendGreet()
                     clientSocket.send(greeting)
+                    logger.debug(f"S:{greeting}")
                     # set timeout after sending greeting and
                     #  waiting for the next command
                     # clientSocket.settimeout(10)
@@ -75,7 +89,7 @@ class ESMTPServer:
                         request = request.decode(encoding="utf-8")
 
                         requestStripped = request.strip()
-                        print(f"Received: {requestStripped}")
+                        logger.debug(f"C: {requestStripped}")
 
                         commandChunk = requestStripped.split(" ")
                         commandInfo = CommandSpecifier(COMMAND=commandChunk[0])
@@ -94,27 +108,33 @@ class ESMTPServer:
         self, command: str, commandChunk: dict, connSocket: socket.socket
     ):
         if command == "EHLO":
+            logger.debug(f'Command Identified is : {command}')
             self.EhloCmdHandler(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
         elif command == "MAIL":
+            logger.debug(f'Command Identified is : {command}')
             self.MailCmdHandler(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
         elif command == "RCPT":
+            logger.debug(f'Command Identified is : {command}')
             self.RcptCmdHandler(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
         elif command == "DATA":
+            logger.debug(f'Command Identified is : {command}')
             self.DataCmdHandler(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
         elif command == "QUIT":
+            logger.debug(f'Command Identified is : {command}')
             self.QuitCmdHanlder(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
         else:
             errorMsg = command
+            logger.debug(f'Command not recognised: "{errorMsg}"')
             connSocket.send(errorMsg.encode("utf-8"))
 
     def EhloCmdHandler(
@@ -124,11 +144,13 @@ class ESMTPServer:
         connSocket: socket.socket,
         timeout: int = 10,
     ):
-        if len(commandTokens) != 2:
+        if len(commandTokens) > 2:
+            logger.debug(f'Unrecognised part from command is: {' '.join(commandTokens[2:])}')
             self.SendError(errorCode=501, clientSocket=connSocket)
 
-        self.SendSuccess(successCode=250, clientSocket=connSocket)
-        self.UpdateState(command=command)
+        else:
+            self.SendSuccess(successCode=250, clientSocket=connSocket)
+            self.UpdateState(command=command)
 
     def MailCmdHandler(
         self,
@@ -149,17 +171,22 @@ class ESMTPServer:
                     connSocket=connSocket
                 )
             else:
+                logger.debug(f'Unrecognised part: {normalizedCommandToken}')
                 self.SendError(errorCode=555, clientSocket=connSocket)
         elif commandTokensCount == 3:
-            if (commandTokens[1].lower()) != "from:":
+            normalizedCommandToken = commandTokens[1].lower()
+            if not normalizedCommandToken.startswith("from:"):
+                logger.debug(f'Unrecognised part: {normalizedCommandToken}')
                 self.SendError(errorCode=555, clientSocket=connSocket)
             else:
+                reversePath = commandTokens[2]
                 self.HandleReversePath(
                     command=command,
-                    reversePath=commandTokens[2],
+                    reversePath=reversePath,
                     connSocket=connSocket
                 )
         else:
+            logger.debug(f"Unrecognised part is: {" ".join(commandTokens)}")
             self.SendError(errorCode=555, clientSocket=connSocket)
 
 
@@ -173,6 +200,7 @@ class ESMTPServer:
             reversePath.endswith(">")
         ):
             senderMailAddress = reversePath[1:-1]
+            logger.debug(f'Reverse-Path from Command is: {reversePath}')
 
             if senderMailAddress:
                 try:
@@ -181,9 +209,10 @@ class ESMTPServer:
                         check_deliverability=True,
                     )
 
-                    print(f"{validSenderAddress.normalized}")
+
                     # normalise email for session use
                     normalizedSenderAddress = validSenderAddress.normalized
+                    logger.debug(f"Normalised Reverse-Path: {normalizedSenderAddress}")
 
                     # start the session
                     if (
@@ -234,9 +263,12 @@ class ESMTPServer:
                         connSocket=connSocket
                     )
                 else:
+                    logger.debug(f'Unrecognised part: {normalizedCommandToken}')
                     self.SendError(errorCode=501, clientSocket=connSocket)
             elif commandTokensCount == 3:
-                if (commandTokens[1].lower()) != "to:":
+                normalizedCommandToken = commandTokens[1].lower()
+                if not normalizedCommandToken.startswith("to:"):
+                    logger.debug(f'Unrecognised part: {normalizedCommandToken}')
                     self.SendError(errorCode=555, clientSocket=connSocket)
                 else:
                     forwardPath = commandTokens[2]
@@ -246,10 +278,12 @@ class ESMTPServer:
                         connSocket=connSocket
                     )
             else:
+                logger.debug(f"Unrecognised part is: {" ".join(commandTokens)}")
                 self.SendError(errorCode=555, clientSocket=connSocket)
 
 
         else:
+            logger.debug(f'Command out of order, previous state:{self.transcationState}')
             self.SendError(errorCode=503, clientSocket=connSocket)
 
 
@@ -258,13 +292,14 @@ class ESMTPServer:
         command:str,
         forwardPath:str,
         connSocket: socket.socket,
-        recipentsLimit:int = 100,
+
     ):
         recipientsListKey = self.mailTranscationObjs[1]
         if recipientsListKey in self.mailTranscation:
             recipientsList = self.mailTranscation[self.mailTranscationObjs[1]]
             # check if recipient list is full
-            if len(recipientsList) >= recipentsLimit :
+            if len(recipientsList) >= self.RECIPIENTS_LIMIT :
+                logger.debug(f'Recipient list is full so bouncing address:{forwardPath}')
                 self.SendError(errorCode=452, clientSocket=connSocket)
                 return   # don't process ideally after temporary error
 
@@ -272,6 +307,7 @@ class ESMTPServer:
             forwardPath.endswith(">")
         ):
             recipientMailAddress = forwardPath[1:-1]
+            logger.debug(f'Forward-Path from Command is: {forwardPath}')
 
             if recipientMailAddress:
                 try:
@@ -280,10 +316,10 @@ class ESMTPServer:
                         check_deliverability=True,
                     )
 
-                    print(f"{validRecipientAddress.normalized}")
                     normalizedRecipientAddress = (
                         validRecipientAddress.normalized
                     )
+                    logger.debug(f"Normalised Forward-Path: {normalizedRecipientAddress}")
 
                     if (
                         recipientsListKey
@@ -293,12 +329,13 @@ class ESMTPServer:
                             recipientsListKey
                         ] = [normalizedRecipientAddress]
                     else:
+                        logger.debug(f'Adding more recipients to the mail: {self.mailTranscation[recipientsListKey]}')
                         self.mailTranscation[
                             recipientsListKey
                         ].append(normalizedRecipientAddress)
 
-                    print(
-                        f"Transcation Session Detail:{self.mailTranscation}"
+                    logger.debug(
+                        f"Transcation Session Detail: {self.mailTranscation}"
                     )
                     self.SendSuccess(
                         successCode=250, clientSocket=connSocket
@@ -307,14 +344,18 @@ class ESMTPServer:
                     self.UpdateState(command=command)
 
                 except EmailNotValidError:
+                    logger.debug(f'Email Not Valid: {recipientMailAddress}')
                     self.SendError(errorCode=550, clientSocket=connSocket)
 
-                except Exception:
+                except Exception as e:
+                    logger.exception(f"Exception Occured: {str(e)}")
                     self.SendError(errorCode=550, clientSocket=connSocket)
             else:
+                logger.debug("Empty recipient forward path")
                 self.SendError(errorCode=553, clientSocket=connSocket)
 
         else:
+            logger.debug(f'Not valid way to enter Forward Path: {forwardPath}')
             self.SendError(errorCode=501, clientSocket=connSocket)
 
 
@@ -383,56 +424,68 @@ class ESMTPServer:
             self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
-            self.SendError(errorCode=421, clientSocket=connSocket)
+            self.SendSuccess(successCode=221, clientSocket=connSocket)
             raise QuitLoopException
 
     def SendError(self, errorCode: int, clientSocket: socket.socket):
-        if errorCode == 421:
-            errorMsg = f"{errorCode} OK Closing transmission channel\r\n"
-            clientSocket.send(errorMsg.encode("utf-8"))
 
         if errorCode == 455:
             errorMsg = f"{errorCode} Server unable to accommodate parameters\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
+            logger.debug(f'S: {errorMsg}')
 
         if errorCode == 500:
             errorMsg = f"{errorCode} Syntax error, command unrecognized\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
+            logger.debug(f'S: {errorMsg}')
 
         if errorCode == 501:
             errorMsg = f"{errorCode} Syntax error in parameters or arguments\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
+            logger.debug(f'S: {errorMsg}')
 
         if errorCode == 503:
             errorMsg = f"{errorCode} Bad sequence of command(s)\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
+            logger.debug(f'S: {errorMsg}')
 
         if errorCode == 550:
             errorMsg = f"{errorCode} Requested action not taken: mailbox unavailable\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
+            logger.debug(f'S: {errorMsg}')
 
         if errorCode == 553:
             errorMsg = (
                 f"{errorCode} Requested action not taken: mailbox name not allowed\r\n"
             )
             clientSocket.send(errorMsg.encode("utf-8"))
+            logger.debug(f'S: {errorMsg}')
 
         if errorCode == 555:
             # syntax error in command
             errorMsg = f"{errorCode} Syntax error, command unrecognized\r\n"
             clientSocket.send(errorMsg.encode("utf-8"))
+            logger.debug(f'S: {errorMsg}')
 
     def SendSuccess(self, successCode: int, clientSocket: socket.socket):
+        if successCode == 221:
+            successMsg = f"{successCode} OK Closing transmission channel\r\n"
+            clientSocket.send(successMsg.encode("utf-8"))
+            logger.debug(f'S: {successMsg}')
+
         if successCode == 250:
             successMsg = f"{successCode} OK Requested mail action okay, completed\r\n"
             clientSocket.send(successMsg.encode("utf-8"))
+            logger.debug(f'S: {successMsg}')
 
         if successCode == 354:
             successMsg = f"{successCode} Start mail input; end with <CRLF>.<CRLF>\r\n"
             clientSocket.send(successMsg.encode("utf-8"))
+            logger.debug(f'S: {successMsg}')
 
     def UpdateState(self, command: str):
         self.transcationState = self.preCommandStates[command]
+        logger.debug(f'State is updated to: {self.transcationState}')
 
     def Insert(self, sender, receiver, data):
         add_mail = "INSERT INTO setu_outbox(sender, receiver, data)VALUES "

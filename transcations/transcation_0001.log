@@ -1,0 +1,16 @@
+2025-12-04 18:16:04,144 - INFO - Starting server on 127.0.0.1:2525
+2025-12-04 18:16:04,145 - DEBUG - Connection Socket is created
+2025-12-04 18:16:09,114 - DEBUG - Connected to client ('127.0.0.1', 64850) 
+2025-12-04 18:16:09,115 - DEBUG - S:b'220 richmail 1.0.0 Service ready\r\n'
+2025-12-04 18:16:15,180 - DEBUG - C: ehlo shubham jangra
+2025-12-04 18:16:15,180 - DEBUG - Command Identified is : EHLO
+2025-12-04 18:16:15,180 - DEBUG - Unrecognised part from command is: 
+2025-12-04 18:16:15,180 - DEBUG - S: 501 Syntax error in parameters or arguments
+
+2025-12-04 18:16:15,180 - DEBUG - S: 250 OK Requested mail action okay, completed
+
+2025-12-04 18:16:15,180 - DEBUG - State is updated to: EHLO_DONE
+2025-12-04 18:17:25,933 - DEBUG - C: quit
+2025-12-04 18:17:25,933 - DEBUG - Command Identified is : QUIT
+2025-12-04 18:17:25,934 - DEBUG - S: 221 OK Closing transmission channel
+

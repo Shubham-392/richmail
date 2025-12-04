@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 test_client.py
+transcations/
 
 # environments
 .env
