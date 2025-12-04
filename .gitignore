@@ -10,6 +10,7 @@ wheels/
 .venv
 test_client.py
 transcations/
+transcation_*.log
 
 # environments
 .env
