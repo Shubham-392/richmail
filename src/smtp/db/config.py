@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-import mysql.connector
+from mysql.connector import pooling
 
 load_dotenv()
 
@@ -11,39 +11,92 @@ DB_PASSWORD= os.environ.get('DB_PASSWORD')
 DB_HOST= os.environ.get('DB_HOST', '127.0.0.1')
 DB_PORT= os.environ.get('DB_PORT', '3306')
 
+db_config = {
+    "host":DB_HOST,
+    "port":DB_PORT,
+    "user":DB_USER,
+    "password":DB_PASSWORD,
+    "database":DB_NAME,
+}
 
-class DBConnection:
 
-    def __init__(self,
-        NAME,
-        USER,
-        PASSWORD,
-        HOST,
-        PORT
+class MySQLPool:
+    def __init__(
+        self,
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+        pool_name='setu',
+        pool_size= 30
     ):
-        self.NAME = NAME
-        self.USER = USER
-        self.PASSWORD = PASSWORD
-        self.HOST = HOST
-        self.PORT = PORT
+        res = {}
+        self._host = host
+        self._port = port
+        self._user = user
+        self._password = password
+        self._database = database
+
+        res["host"] = self._host
+        res["port"] = self._port
+        res["user"] = self._user
+        res["password"] = self._password
+        res["database"] = self._database
+        self.dbconfig = res
+        self.pool = self.create_pool(pool_name=pool_name, pool_size=pool_size)
+
+    def create_pool(self, pool_name="setu", pool_size=3):
+            """
+            Create a connection pool, after created, the request of connecting
+            MySQL could get a connection from this pool instead of request to
+            create a connection.
+            :param pool_name: the name of pool, default is "mypool"
+            :param pool_size: the size of pool, default is 3
+            :return: connection pool
+            """
+            pool = pooling.MySQLConnectionPool(
+                pool_name=pool_name,
+                pool_size=pool_size,
+                pool_reset_session=True,
+                **self.dbconfig
+            )
+            return pool
+
+    def close(self, conn, cursor):
+            """
+            A method used to close connection of mysql.
+            :param conn:
+            :param cursor:
+            :return:
+            """
+            cursor.close()
+            conn.close()
+
+    def execute(self, sql, args=None, commit=False):
+            """
+            Execute a sql, it could be with args and with out args. The usage is
+            similar with execute() function in module pymysql.
+            :param sql: sql clause
+            :param args: args need by sql clause
+            :param commit: whether to commit
+            :return: if commit, return None, else, return result
+            """
+            # get connection form connection pool instead of create one.
+            conn = self.pool.get_connection()
+            cursor = conn.cursor()
+            if args:
+                cursor.execute(sql, args)
+            else:
+                cursor.execute(sql)
+            if commit is True:
+                conn.commit()
+                self.close(conn, cursor)
+                return None
+            else:
+                res = cursor.fetchall()
+                self.close(conn, cursor)
+                return res
 
 
-    def connect(self):
-
-        connection = mysql.connector.connect(
-            host = self.HOST,
-            port = self.PORT,
-            user = self.USER,
-            password = self.PASSWORD,
-            database = self.NAME,
-        )
-
-        return connection
-
-conn = DBConnection(
-    NAME=DB_NAME,
-    USER=DB_USER,
-    PASSWORD=DB_PASSWORD,
-    HOST=DB_HOST,
-    PORT=DB_PORT
-)
+connPool = MySQLPool(**db_config)
