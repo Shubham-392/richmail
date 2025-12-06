@@ -26,11 +26,6 @@ class QuitLoopException(Exception):
     pass
 
 
-class SMTPTimeoutError(Exception):
-    pass
-
-
-
 class ESMTPServer:
     # Recipients Limit
     RECIPIENTS_LIMIT:int = 100
@@ -41,6 +36,7 @@ class ESMTPServer:
         "MAIL": "MAIL_DONE",
         "RCPT": "RCPT_DONE",
         "DATA": "DATA_DONE",
+        "RSET":"RSET_DONE",
     }
 
     mailTranscationObjs = [
@@ -49,7 +45,7 @@ class ESMTPServer:
         "dataBuffer",  # message body of mail
     ]
 
-    # Transcation detail for adding in message queue and for logging
+    # Transcation detail for adding in message queue & for logging
     mailTranscation = {}
 
     def __init__(self, addressFamily=socket.AF_INET, stream=socket.SOCK_STREAM):
@@ -61,9 +57,6 @@ class ESMTPServer:
         greeting = f"{greetCode} {softwareAndVersion} Service ready\r\n"
         greeting = greeting.encode(encoding="utf-8")
         return greeting
-
-    def timeout_raise(self):
-        raise SMTPTimeoutError("Client did not respond in time")
 
     def run(self, HOST="127.0.0.1", PORT=2525):
         logger.info(f"Starting server on {HOST}:{PORT}")
@@ -129,6 +122,11 @@ class ESMTPServer:
         elif command == "QUIT":
             logger.debug(f'Command Identified is : {command}')
             self.QuitCmdHanlder(
+                command=command, commandTokens=commandChunk, connSocket=connSocket
+            )
+        elif command == "RSET":
+            logger.debug(f'Command Identified is : {command}')
+            self.RsetCmdHanlder(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
         else:
@@ -367,7 +365,7 @@ class ESMTPServer:
     ):
         if self.transcationState == self.preCommandStates["RCPT"]:
             if len(commandTokens) != 1:
-                logger.debug(f'Unable to recognize these parts: {" ".joinn(commandTokens[1:])}')
+                logger.debug(f'Unable to recognize these parts: {" ".join(commandTokens[1:])}')
                 self.SendError(errorCode=455, clientSocket=connSocket)
             else:
                 self.SendSuccess(successCode=354, clientSocket=connSocket)
@@ -428,21 +426,47 @@ class ESMTPServer:
                     self.SendError(errorCode=451, clientSocket=connSocket)
                     self.mailTranscation = {}
         else:
-            logger.debug(f'Command out of Order, Previous State is : {self.mailTranscation}')
+            logger.debug(f'Command out of Order, current state is {self.transcationState}')
             self.SendError(errorCode=503, clientSocket=connSocket)
 
     def QuitCmdHanlder(
-        self, command: str, commandTokens: dict, connSocket: socket, timeout: int = 10
+        self, command: str, commandTokens: dict, connSocket: socket.socket, timeout: int = 10
     ) -> bool:
         # send response to the client which acknowledges that the
         # connection should be closed and break out of the loop
         if len(commandTokens) != 1:
-            logger.debug(f'Unable to recognize these parts: {" ".joinn(commandTokens[1:])}')
+            logger.debug(f'Unable to recognize these parts: {" ".join(commandTokens[1:])}')
             self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
             self.SendSuccess(successCode=221, clientSocket=connSocket)
             raise QuitLoopException
+
+    def RsetCmdHanlder(
+        self, command: str, commandTokens: dict, connSocket: socket, timeout: int = 10
+    ) -> bool:
+
+        """
+        RSET
+
+        This command specifies that the current mail transcation will be aborted.
+
+        Any stored sender, recipients, and mail data MUST be discarded, and all buffers and state tables cleared.
+
+        MUST send a `250 OK ` reply to a RSET command with no arguments.
+
+
+        """
+        if len(commandTokens) != 1:
+            logger.debug(f'Unable to recognize these parts: {" ".join(commandTokens[1:])}')
+            self.SendError(errorCode=455, clientSocket=connSocket)
+
+        else:
+            self.mailTranscation = {}
+            self.UpdateState(command=command)
+            logger.debug("Cleared all transcation buffers and state updated to 'INIT'")
+            self.SendSuccess(successCode=250, clientSocket=connSocket)
+
 
     def SendError(self,
         errorCode: int,

@@ -11,7 +11,8 @@ class CommandSpecifier:
         "MAIL",
         "RCPT",
         "DATA",
-        "QUIT"
+        "QUIT",
+        "RSET"
     ]
 
     def __init__(self, COMMAND: str):
