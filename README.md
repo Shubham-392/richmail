@@ -3,7 +3,7 @@
 
 
 
-![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)
+![Build Status](https://img.shields.io/badge/github-repo-blue?logo=github)
 
 Setu is a mail receving MTA accepts mail from outbound servers like gmail, outlook, yahoo,etc.
 
