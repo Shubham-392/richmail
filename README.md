@@ -3,7 +3,7 @@
 
 
 
-[![Build Status](https://www.github.com/Shubham-392)](https://img.shields.io/badge/github-repo-blue?logo=github)
+![Build Status](https://img.shields.io/badge/github-repo-blue?logo=github)
 
 Setu is a mail receving MTA accepts mail from outbound servers like gmail, outlook, yahoo,etc.
 
