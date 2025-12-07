@@ -1,0 +1,2 @@
+class QuitLoopException(Exception):
+    pass
