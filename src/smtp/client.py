@@ -39,7 +39,7 @@ def run_client():
                 while True:
                     dataLine = input("")
                     if dataLine == ".":
-                        dataLineWithCRLF = f'{dataLine} {CRLF}'
+                        dataLineWithCRLF = f'{dataLine}{CRLF}'
                         client.send(dataLineWithCRLF.encode("utf-8"))
                         break
 

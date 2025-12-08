@@ -45,3 +45,26 @@ class TranscationLogHierarchy:
 
 
 transc = TranscationLogHierarchy()
+
+
+# class SessionsLogHierarchy:
+#     """
+#     Sets a system for logging the files in specific pattern
+
+#     files created under the `transcations` directory have pattern
+
+#     transcation_*.log
+#     """
+
+#     current_direct = Path.cwd()
+#     directory_path = current_direct / "sessions"
+
+#     transcation_file_pattern = "session_*.log" # here * means the {threadID}
+
+
+
+#     def __init__(self):
+#         pass
+
+#     def make_dir(self):
+#         self.directory_path.mkdir(exist_ok=True)

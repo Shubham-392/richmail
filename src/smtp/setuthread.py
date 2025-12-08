@@ -5,7 +5,7 @@ from email_validator import EmailNotValidError, validate_email
 from src.smtp.db.config import connPool
 from src.smtp.exceptions import QuitLoopException
 
-from src.smtp.setuplog import logger
+from src.smtp.logger.setup import logger
 from src.smtp.smtpd import CommandSpecifier
 
 

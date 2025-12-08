@@ -1,14 +1,34 @@
 import socket
 from threading import Thread
 
-# import mysql.connector
-# from email_validator import EmailNotValidError, validate_email
-
-# from src.smtp.exceptions import QuitLoopException
-# from src.smtp.db.config import connPool
-from src.smtp.logger.setuplog import logger
+from src.smtp.logger.setup import logger
 from src.smtp.setuthread import ESMTPSession
-
+#/*     The SMTP server is moderately security-sensitive. It talks to SMTP
+#/*	    clients and to DNS servers on the network. The SMTP server can be
+#/* 	run chrooted at fixed low privilege.
+# /*    STANDARDS
+# /*	RFC 821 (SMTP protocol)
+# /*	RFC 1123 (Host requirements)
+# /*	RFC 1652 (8bit-MIME transport)
+# /*	RFC 1869 (SMTP service extensions)
+# /*	RFC 1870 (Message size declaration)
+# /*	RFC 1985 (ETRN command)
+# /*	RFC 2034 (SMTP enhanced status codes)
+# /*	RFC 2554 (AUTH command)
+# /*	RFC 2821 (SMTP protocol)
+# /*	RFC 2920 (SMTP pipelining)
+# /*	RFC 3030 (CHUNKING without BINARYMIME)
+# /*	RFC 3207 (STARTTLS command)
+# /*	RFC 3461 (SMTP DSN extension)
+# /*	RFC 3463 (Enhanced status codes)
+# /*	RFC 3848 (ESMTP transmission types)
+# /*	RFC 4409 (Message submission)
+# /*	RFC 4954 (AUTH command)
+# /*	RFC 5321 (SMTP protocol)
+# /*	RFC 6531 (Internationalized SMTP)
+# /*	RFC 6533 (Internationalized Delivery Status Notifications)
+# /*	RFC 7505 ("Null MX" No Service Resource Record)
+# /*	RFC 8689 (SMTP REQUIRETLS extension)
 
 
 class ESMTPServer:
@@ -34,7 +54,7 @@ class ESMTPServer:
                     clientAddress=clientAddress
                 )
 
-                #start the thread for newly connected to service
+                # start the thread for newly connected to server
                 thread = Thread(
                     target = Session.startThread,
                     daemon=True
