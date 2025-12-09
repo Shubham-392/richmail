@@ -4,6 +4,7 @@ from email_validator import EmailNotValidError, validate_email
 
 from src.smtp.db.config import connPool
 from src.smtp.exceptions import QuitLoopException
+from src.smtp.mime.parser import MIMEParser
 
 from src.smtp.logger.setup import logger
 from src.smtp.smtpd import CommandSpecifier
@@ -390,6 +391,9 @@ class ESMTPSession:
 
                 # store in transaction
                 self.mailTranscation[self.mailTranscationObjs[2]] = DataCommandBuffer
+
+                # parse message to look if msg is formatted in MIME format
+                MIMEParser.parse(dataBuffer=DataCommandBuffer)
 
                 logger.debug('Inserting the mail transcation in DB')
                 try:
