@@ -391,9 +391,12 @@ class ESMTPSession:
 
                 # store in transaction
                 self.mailTranscation[self.mailTranscationObjs[2]] = DataCommandBuffer
-
+                # create object for MIME parser initialization
+                parser = MIMEParser()
                 # parse message to look if msg is formatted in MIME format
-                MIMEParser.parse(dataBuffer=DataCommandBuffer)
+                logger.debug("Now parsing the message for MIME support")
+                parser.parse(dataBuffer=DataCommandBuffer)
+
 
                 logger.debug('Inserting the mail transcation in DB')
                 try:

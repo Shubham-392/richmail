@@ -1,6 +1,6 @@
+# as per RFC 2045
+#  MIME-Version Header
+mime_version = "MIME-VERSION"
+mime_version_value = "1.0"
 
-headers = {
-    "MIME-VERSION":"MIME-Version",
-    "CONTENT-TYPE":"Content-Type",
-    "CONTENT-TRANSFER-ENCODING":"Content-Type-Encoding"
-}
+# Content-Type Header
