@@ -1,7 +1,12 @@
 # as per RFC 2045
 #  MIME-Version Header
-mime_version = "MIME-VERSION"
-mime_version_value = "1.0"
+MIMEVersion = "MIME-VERSION"
+MIMEVersionDefault = "1.0"
+
+# FROM field
+FROM = "FROM"
+# TO field
+TO = "TO"
 
 # Content-Type Header
 content_type = "CONTENT-TYPE"
