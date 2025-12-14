@@ -7,6 +7,8 @@ MIMEVersionDefault = "1.0"
 FROM = "FROM"
 # TO field
 TO = "TO"
+# Subject field
+SUBJECT = "SUBJECT"
 
 # Content-Type Header
 content_type = "CONTENT-TYPE"

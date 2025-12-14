@@ -1,4 +1,4 @@
-from src.smtp.mime.headers import FROM, TO,content_type, MIMEVersion,MIMEVersionDefault
+from src.smtp.mime.headers import FROM, SUBJECT, TO,content_type, MIMEVersion,MIMEVersionDefault
 from src.smtp.mime.utils import extractComments
 # from src.smtp.logger.setup import logger
 
@@ -26,6 +26,8 @@ class MIMEParser:
                     self.StoreHeaderInfo(header=header, value=value)
                 elif header.upper() == TO:
                     self.StoreHeaderInfo(header=header, value=value)
+                elif header.upper() == SUBJECT:
+                    self.StoreHeaderInfo(header=header, value=value)
 
 
     def StoreHeaderInfo(self, header:str, value:str, comments:list = None):
@@ -45,5 +47,3 @@ class MIMEParser:
 
         elif header.upper() == TO:
             self.MIMEInfo['headers']['To'] = value
-
-        print(self.MIMEInfo)
