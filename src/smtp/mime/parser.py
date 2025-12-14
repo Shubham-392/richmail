@@ -1,5 +1,9 @@
-from src.smtp.mime.headers import FROM, SUBJECT, TO,content_type, MIMEVersion,MIMEVersionDefault
-from src.smtp.mime.utils import extractComments
+from src.smtp.mime.headers import (
+    CONTENT_TYPE,
+    FROM, SUBJECT, TO,
+    MIMEVersion,MIMEVersionDefault
+)
+from src.smtp.mime.utils import extractComments, extractMediaTypes
 # from src.smtp.logger.setup import logger
 
 class MIMEParser:
@@ -13,8 +17,8 @@ class MIMEParser:
                 rawHeader, rawValue = line.split(":", 1)
                 header, value = rawHeader.strip(), rawValue.strip()
 
-                if header.upper() == content_type:
-                    ...
+                if header.upper() == CONTENT_TYPE:
+                    Type, SubType = extractMediaTypes(header_value=value)
 
                 elif header.upper() == MIMEVersion:
                     if value == MIMEVersionDefault:

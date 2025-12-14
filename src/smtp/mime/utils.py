@@ -35,3 +35,24 @@ def extractComments(header_value:str):
 
     version = "".join(rawVersion)
     return comments, version
+
+
+def extractMediaTypes(header_value:str):
+    rawType = []
+    rawSubType = []
+    i=0
+    while i < len(header_value):
+        if header_value[i] == "/":
+            i += 1
+            break
+        rawType.append(header_value[i])
+        i += 1
+
+    while i < len(header_value):
+        if header_value[i] == ";":
+            break
+        rawSubType.append(header_value[i])
+        i += 1
+
+    Type, SubType = "".join(rawType), "".join(rawSubType)
+    return Type, SubType

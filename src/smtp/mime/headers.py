@@ -11,4 +11,17 @@ TO = "TO"
 SUBJECT = "SUBJECT"
 
 # Content-Type Header
-content_type = "CONTENT-TYPE"
+CONTENT_TYPE = "CONTENT-TYPE"
+TYPES = {
+    "DISCRETE-TYPES": [
+        "TEXT",
+        "IMAGE",
+        "AUDIO",
+        "VIDEO",
+        "APPLICATION",
+    ],
+    "COMPOSITE-TYPES":[
+        "MESSAGE",
+        "MULTIPART"
+    ]
+}
