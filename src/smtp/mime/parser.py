@@ -19,6 +19,9 @@ class MIMEParser:
 
                 if header.upper() == CONTENT_TYPE:
                     Type, SubType = extractMediaTypes(header_value=value)
+                    if not ((Type == 'plain') and (SubType == 'text')):
+                        self.StoreHeaderInfo(header=header, value=value, type=Type, subType=SubType)
+                    self.StoreHeaderInfo(header=header, value=value)
 
                 elif header.upper() == MIMEVersion:
                     if value == MIMEVersionDefault:
@@ -34,7 +37,14 @@ class MIMEParser:
                     self.StoreHeaderInfo(header=header, value=value)
 
 
-    def StoreHeaderInfo(self, header:str, value:str, comments:list = None):
+    def StoreHeaderInfo(
+        self,
+        header:str,
+        value:str = None,
+        comments:list = None,
+        type:str = "plain",
+        subType:str = "text",
+    ):
         # Initialize headers dict only if it doesn't exist
         if 'headers' not in self.MIMEInfo:
             self.MIMEInfo['headers'] = {}
@@ -51,3 +61,16 @@ class MIMEParser:
 
         elif header.upper() == TO:
             self.MIMEInfo['headers']['To'] = value
+        elif header.upper() == SUBJECT:
+            self.MIMEInfo['headers']['Subject'] = value
+        elif header.upper() == CONTENT_TYPE:
+            self.MIMEInfo['headers']['Content-Type'] = {
+                'Media':{
+
+                },
+                'Attributes':[
+
+                ]
+            }
+            self.MIMEInfo['headers']['Content-Type']['Media']['Type'] = type
+            self.MIMEInfo['headers']['Content-Type']['Media']['Sub-type'] = subType
