@@ -1,5 +1,9 @@
-from src.smtp.mime.headers import content_type, mime_version, mime_version_value
-from src.smtp.mime.utils import extractComments
+from src.smtp.mime.headers import (
+    CONTENT_TYPE,
+    FROM, SUBJECT, TO,
+    MIMEVersion,MIMEVersionDefault
+)
+from src.smtp.mime.utils import extractComments, extractMediaTypes
 # from src.smtp.logger.setup import logger
 
 class MIMEParser:
@@ -11,27 +15,62 @@ class MIMEParser:
         for line in lines:
             if ":" in line:
                 rawHeader, rawValue = line.split(":", 1)
-                print(rawHeader,rawValue)
-                header, version = rawHeader.strip(), rawValue.strip()
+                header, value = rawHeader.strip(), rawValue.strip()
 
-                if header.upper() == content_type:
-                    ...
+                if header.upper() == CONTENT_TYPE:
+                    Type, SubType = extractMediaTypes(header_value=value)
+                    if not ((Type == 'plain') and (SubType == 'text')):
+                        self.StoreHeaderInfo(header=header, value=value, type=Type, subType=SubType)
+                    self.StoreHeaderInfo(header=header, value=value)
 
-                elif header.upper() == mime_version:
-                    if version == mime_version_value:
-                        self.StoreHeaderInfo(header=header, version=version)
-                    comments = extractComments(header_value=version)
-                    self.StoreHeaderInfo(header=header, version=version, comments=comments)
+                elif header.upper() == MIMEVersion:
+                    if value == MIMEVersionDefault:
+                        self.StoreHeaderInfo(header=header, value=value)
+                    comments, version = extractComments(header_value=value)
+                    self.StoreHeaderInfo(header=header, value=version, comments=comments)
+
+                elif header.upper() == FROM:
+                    self.StoreHeaderInfo(header=header, value=value)
+                elif header.upper() == TO:
+                    self.StoreHeaderInfo(header=header, value=value)
+                elif header.upper() == SUBJECT:
+                    self.StoreHeaderInfo(header=header, value=value)
 
 
-    def StoreHeaderInfo(self, header:str, version:str, comments:list = None):
+    def StoreHeaderInfo(
+        self,
+        header:str,
+        value:str = None,
+        comments:list = None,
+        type:str = "plain",
+        subType:str = "text",
+    ):
         # Initialize headers dict only if it doesn't exist
         if 'headers' not in self.MIMEInfo:
             self.MIMEInfo['headers'] = {}
 
-        if header.upper() == mime_version.upper():
+        if header.upper() == MIMEVersion:
             self.MIMEInfo['headers']['MIME-Version']= {}
-            self.MIMEInfo['headers']['MIME-Version']['name'] = mime_version
-            self.MIMEInfo['headers']['MIME-Version']['version'] = version
+            self.MIMEInfo['headers']['MIME-Version']['name'] = MIMEVersion
+            self.MIMEInfo['headers']['MIME-Version']['version'] = value
             if comments is not None:
                 self.MIMEInfo['headers']['MIME-Version']['comments'] = comments
+
+        elif header.upper() == FROM:
+            self.MIMEInfo['headers']['From'] = value
+
+        elif header.upper() == TO:
+            self.MIMEInfo['headers']['To'] = value
+        elif header.upper() == SUBJECT:
+            self.MIMEInfo['headers']['Subject'] = value
+        elif header.upper() == CONTENT_TYPE:
+            self.MIMEInfo['headers']['Content-Type'] = {
+                'Media':{
+
+                },
+                'Attributes':[
+
+                ]
+            }
+            self.MIMEInfo['headers']['Content-Type']['Media']['Type'] = type
+            self.MIMEInfo['headers']['Content-Type']['Media']['Sub-type'] = subType
