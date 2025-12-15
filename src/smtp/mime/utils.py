@@ -37,10 +37,15 @@ def extractComments(header_value:str):
     return comments, version
 
 
-def extractMediaTypes(header_value:str):
+def extractMediaTypes(header_value: str):
+    """
+    Extract media type, subtype, and attributes from Content-Type header.
+    """
     rawType = []
     rawSubType = []
-    i=0
+    i = 0
+
+    # Extract type (before '/')
     while i < len(header_value):
         if header_value[i] == "/":
             i += 1
@@ -48,11 +53,65 @@ def extractMediaTypes(header_value:str):
         rawType.append(header_value[i])
         i += 1
 
+    # Extract subtype (before ';' or end of string)
     while i < len(header_value):
         if header_value[i] == ";":
-            break
+            attributeInitial = header_value[i+1:]
+            CORRUPTED, variable, value = extractAttribute(attributeClaim=attributeInitial)
+            Type = "".join(rawType).strip()
+            SubType = "".join(rawSubType).strip()
+            return Type, SubType, CORRUPTED, variable, value
         rawSubType.append(header_value[i])
         i += 1
 
-    Type, SubType = "".join(rawType), "".join(rawSubType)
-    return Type, SubType
+    # No attributes found
+    Type = "".join(rawType).strip()
+    SubType = "".join(rawSubType).strip()
+    return Type, SubType, False, "", ""
+
+
+def extractAttribute(attributeClaim: str) -> tuple[bool, str, str]:
+    """
+    Extract attribute name and value from parameter string.
+    """
+    cleanAttributeClaim = attributeClaim.strip()
+    CORRUPTED = False
+    rawVariable = []
+    rawValue = []
+    index = 0
+
+    # Extract variable name (before '=')
+    while index < len(cleanAttributeClaim):
+        char = cleanAttributeClaim[index]
+
+        if char == "=":
+            index += 1
+            break
+        elif char == " ":
+            # Space found before '=' - this is invalid
+            CORRUPTED = True
+            return CORRUPTED, "", ""
+        else:
+            rawVariable.append(char)
+            index += 1
+
+    # If we didn't find '=', it's corrupted
+    if index >= len(cleanAttributeClaim):
+        return True, "", ""
+
+    # Extract value (after '=')
+    for idx in range(index, len(cleanAttributeClaim)):
+        char = cleanAttributeClaim[idx]
+        if char == '"':
+            # Skip quote characters
+            continue
+        elif char == " " and not rawValue:
+            # Skip leading spaces after '='
+            continue
+        else:
+            rawValue.append(char)
+
+    variable = ''.join(rawVariable)
+    value = ''.join(rawValue)
+
+    return CORRUPTED, variable, value

@@ -1,7 +1,7 @@
 from src.smtp.mime.headers import (
     CONTENT_TYPE,
     FROM, SUBJECT, TO,
-    MIMEVersion,MIMEVersionDefault
+    MIMEVersion, MIMEVersionDefault
 )
 from src.smtp.mime.utils import extractComments, extractMediaTypes
 # from src.smtp.logger.setup import logger
@@ -18,10 +18,21 @@ class MIMEParser:
                 header, value = rawHeader.strip(), rawValue.strip()
 
                 if header.upper() == CONTENT_TYPE:
-                    Type, SubType = extractMediaTypes(header_value=value)
-                    if not ((Type == 'plain') and (SubType == 'text')):
-                        self.StoreHeaderInfo(header=header, value=value, type=Type, subType=SubType)
-                    self.StoreHeaderInfo(header=header, value=value)
+                    Type, SubType, CORRUPTED, attribute, attributeValue = extractMediaTypes(header_value=value)
+
+                    attributeInfo = {}
+                    if not CORRUPTED and attribute and attributeValue:
+                        attributeInfo = {
+                            'name': attribute,
+                            'value': attributeValue
+                        }
+                    self.StoreHeaderInfo(
+                        header=header,
+                        value=value,
+                        type=Type,
+                        subType=SubType,
+                        attribute=attributeInfo
+                    )
 
                 elif header.upper() == MIMEVersion:
                     if value == MIMEVersionDefault:
@@ -36,6 +47,8 @@ class MIMEParser:
                 elif header.upper() == SUBJECT:
                     self.StoreHeaderInfo(header=header, value=value)
 
+        print(self.MIMEInfo)
+
 
     def StoreHeaderInfo(
         self,
@@ -44,6 +57,7 @@ class MIMEParser:
         comments:list = None,
         type:str = "plain",
         subType:str = "text",
+        attribute:dict = None,
     ):
         # Initialize headers dict only if it doesn't exist
         if 'headers' not in self.MIMEInfo:
@@ -51,7 +65,7 @@ class MIMEParser:
 
         if header.upper() == MIMEVersion:
             self.MIMEInfo['headers']['MIME-Version']= {}
-            self.MIMEInfo['headers']['MIME-Version']['name'] = MIMEVersion
+            self.MIMEInfo['headers']['MIME-Version']['name'] = header
             self.MIMEInfo['headers']['MIME-Version']['version'] = value
             if comments is not None:
                 self.MIMEInfo['headers']['MIME-Version']['comments'] = comments
@@ -65,12 +79,12 @@ class MIMEParser:
             self.MIMEInfo['headers']['Subject'] = value
         elif header.upper() == CONTENT_TYPE:
             self.MIMEInfo['headers']['Content-Type'] = {
-                'Media':{
-
-                },
-                'Attributes':[
-
-                ]
+                'media':{},
+                'attributes':[],
             }
-            self.MIMEInfo['headers']['Content-Type']['Media']['Type'] = type
-            self.MIMEInfo['headers']['Content-Type']['Media']['Sub-type'] = subType
+            self.MIMEInfo['headers']['Content-Type']['media']['type'] = type
+            self.MIMEInfo['headers']['Content-Type']['media']['subtype'] = subType
+
+            attributeContainer = self.MIMEInfo['headers']['Content-Type']['attributes']
+            if attribute:
+                attributeContainer.append(attribute)
