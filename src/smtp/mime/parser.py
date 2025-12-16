@@ -1,7 +1,9 @@
+
 from src.smtp.mime.headers import (
     CONTENT_TYPE,
     FROM, SUBJECT, TO,
-    MIMEVersion, MIMEVersionDefault
+    MIMEVersion, MIMEVersionDefault,
+    TYPES
 )
 from src.smtp.mime.utils import extractComments, extractMediaTypes
 # from src.smtp.logger.setup import logger
@@ -11,28 +13,33 @@ class MIMEParser:
         self.MIMEInfo = {}
 
     def parse(self, dataBuffer: str):
+        # split per '\n' as in server.py after successfull
+        # CRLF is replaced with '\n' for every new line.
         lines = dataBuffer.split("\n")
         for line in lines:
+            # ':' indicates header as per syntax of headers in RFC
             if ":" in line:
                 rawHeader, rawValue = line.split(":", 1)
                 header, value = rawHeader.strip(), rawValue.strip()
 
                 if header.upper() == CONTENT_TYPE:
                     Type, SubType, CORRUPTED, attribute, attributeValue = extractMediaTypes(header_value=value)
+                    if Type in TYPES:
+                        attributeInfo = {}
+                        # check if the value is not corrupted and true attribute and value are stored
+                        if not CORRUPTED and attribute and attributeValue:
+                            attributeInfo = {
+                                'name': attribute,
+                                'value': attributeValue
+                            }
 
-                    attributeInfo = {}
-                    if not CORRUPTED and attribute and attributeValue:
-                        attributeInfo = {
-                            'name': attribute,
-                            'value': attributeValue
-                        }
-                    self.StoreHeaderInfo(
-                        header=header,
-                        value=value,
-                        type=Type,
-                        subType=SubType,
-                        attribute=attributeInfo
-                    )
+                        self.StoreHeaderInfo(
+                            header=header,
+                            value=value,
+                            type=Type,
+                            subType=SubType,
+                            attribute=attributeInfo
+                        )
 
                 elif header.upper() == MIMEVersion:
                     if value == MIMEVersionDefault:
@@ -46,8 +53,6 @@ class MIMEParser:
                     self.StoreHeaderInfo(header=header, value=value)
                 elif header.upper() == SUBJECT:
                     self.StoreHeaderInfo(header=header, value=value)
-
-        print(self.MIMEInfo)
 
 
     def StoreHeaderInfo(
@@ -77,6 +82,7 @@ class MIMEParser:
             self.MIMEInfo['headers']['To'] = value
         elif header.upper() == SUBJECT:
             self.MIMEInfo['headers']['Subject'] = value
+
         elif header.upper() == CONTENT_TYPE:
             self.MIMEInfo['headers']['Content-Type'] = {
                 'media':{},

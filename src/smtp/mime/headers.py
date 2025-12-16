@@ -12,16 +12,12 @@ SUBJECT = "SUBJECT"
 
 # Content-Type Header
 CONTENT_TYPE = "CONTENT-TYPE"
-TYPES = {
-    "DISCRETE-TYPES": [
+TYPES = [
         "TEXT",
         "IMAGE",
         "AUDIO",
         "VIDEO",
         "APPLICATION",
-    ],
-    "COMPOSITE-TYPES":[
         "MESSAGE",
-        "MULTIPART"
-    ]
-}
+        "MULTIPART",
+]

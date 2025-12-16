@@ -1,8 +1,10 @@
 
-def extractComments(header_value:str):
+def extractComments(header_value:str) -> tuple[list, str]:
     """
     Extract all comments from an RFC 2045 header field value.
     Returns a list of comment strings (without the parentheses).
+
+    and version as per Client
     """
     comments = []
     rawVersion = []
@@ -41,8 +43,8 @@ def extractMediaTypes(header_value: str):
     """
     Extract media type, subtype, and attributes from Content-Type header.
     """
-    rawType = []
-    rawSubType = []
+    rawType = [] # list of characters for type to be joined later
+    rawSubType = [] # list of characters for sub-type to be joined later
     i = 0
 
     # Extract type (before '/')
@@ -57,6 +59,9 @@ def extractMediaTypes(header_value: str):
     while i < len(header_value):
         if header_value[i] == ";":
             attributeInitial = header_value[i+1:]
+            # CORRUPTED means there is some syntax error in Header
+            # bool: True or False
+
             CORRUPTED, variable, value = extractAttribute(attributeClaim=attributeInitial)
             Type = "".join(rawType).strip()
             SubType = "".join(rawSubType).strip()
@@ -72,7 +77,9 @@ def extractMediaTypes(header_value: str):
 
 def extractAttribute(attributeClaim: str) -> tuple[bool, str, str]:
     """
-    Extract attribute name and value from parameter string.
+    Extract attribute `name` and `value` from parameter string.
+
+    and also return either header is `corrupted` or not.
     """
     cleanAttributeClaim = attributeClaim.strip()
     CORRUPTED = False
