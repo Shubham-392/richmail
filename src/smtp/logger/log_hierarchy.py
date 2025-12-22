@@ -5,14 +5,14 @@ class TranscationLogHierarchy:
     """
     Sets a system for logging the files in specific pattern
 
-    files created under the `transcations` directory have pattern
+    files created under the `sessions` directory have pattern
 
-    transcation_*.log
+    session_*.log
     """
 
     current_direct = Path.cwd()
-    directory_path = current_direct / "transcations"
-    transcation_file_pattern = "transcation_*.log"
+    directory_path = current_direct / "sessions"
+    transcation_file_pattern = "session_*.log"
 
     def __init__(self):
         pass
@@ -25,7 +25,7 @@ class TranscationLogHierarchy:
             current_suffix = len(
                 [
                     file
-                    for file in self.directory_path.glob("transcation_*.log")
+                    for file in self.directory_path.glob("session_*.log")
                     if file.is_file()
                 ]
             )
@@ -33,8 +33,8 @@ class TranscationLogHierarchy:
         return next_suffix
 
     def transcation_path(self, next_suffix: str):
-        "return next file path for transcation log to create"
-        file_path = self.directory_path / f"transcation_{next_suffix}.log"
+        "return next file path for session log to create"
+        file_path = self.directory_path / f"session_{next_suffix}.log"
         return file_path
 
     def create_log(self):
@@ -45,26 +45,3 @@ class TranscationLogHierarchy:
 
 
 transc = TranscationLogHierarchy()
-
-
-# class SessionsLogHierarchy:
-#     """
-#     Sets a system for logging the files in specific pattern
-
-#     files created under the `transcations` directory have pattern
-
-#     transcation_*.log
-#     """
-
-#     current_direct = Path.cwd()
-#     directory_path = current_direct / "sessions"
-
-#     transcation_file_pattern = "session_*.log" # here * means the {threadID}
-
-
-
-#     def __init__(self):
-#         pass
-
-#     def make_dir(self):
-#         self.directory_path.mkdir(exist_ok=True)

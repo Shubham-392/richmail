@@ -9,8 +9,8 @@ wheels/
 # Virtual environments
 .venv
 test_client.py
-transcations/
-transcation_*.log
+sessions/
+session_*.log
 
 # environments
 .env
