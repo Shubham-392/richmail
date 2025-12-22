@@ -91,28 +91,30 @@ class ESMTPSession:
     def CommandHandler(
         self, command: str, commandChunk: dict, connSocket: socket.socket
     ):
-        
+
         CommandHandlers = {
             'EHLO': self.EhloCmdHandler,
             'RSET': self.RsetCmdHandler,
             'MAIL': self.MailCmdHandler,
             'RCPT': self.RcptCmdHandler,
-            'DATA': self.DataCmdHandler, 
-            'QUIT': self.QuitCmdHandler, 
+            'DATA': self.DataCmdHandler,
+            'QUIT': self.QuitCmdHandler,
+            'NOOP': self.NoopCmdHandler,
+
         }
-        
+
         if command in serverCommands:
             logger.debug(f'Command Identified is: {command}')
             CmdHandler = CommandHandlers.get(command)
             CmdHandler(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
-            
+
         else:
             errorMsg = command
             logger.debug(f'Command not recognised: "{errorMsg}"')
             connSocket.send(errorMsg.encode("utf-8"))
-            
+
 
     def EhloCmdHandler(
         self,
@@ -452,6 +454,32 @@ class ESMTPSession:
             self.UpdateState(command=command)
             logger.debug("Cleared all transcation buffers and state updated to 'INIT'")
             self.SendSuccess(successCode=250, clientSocket=connSocket)
+
+
+    def NoopCmdHandler(
+        self, command: str, commandTokens: dict, connSocket: socket, timeout: int = 10
+    ) :
+        """
+        This command has no effect on the reverse-path buffer, the forward-
+        path buffer, or the mail data buffer, and it may be issued at any
+        time.
+
+        It specifies no action other than that the receiver send a
+        "250 OK" reply.
+
+        """
+
+        if len(commandTokens) != 1:
+            logger.debug(f'Unable to recognize these parts: {" ".join(commandTokens[1:])}')
+            self.SendError(errorCode=501, clientSocket=connSocket)
+
+        else:
+            self.SendSuccess(
+                successCode=250,
+                clientSocket=connSocket
+            )
+
+
 
 
     def SendError(self,

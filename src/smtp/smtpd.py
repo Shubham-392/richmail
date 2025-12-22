@@ -12,7 +12,8 @@ class CommandSpecifier:
         "RCPT",
         "DATA",
         "QUIT",
-        "RSET"
+        "RSET",
+        "NOOP",
     ]
 
     def __init__(self, COMMAND: str):
