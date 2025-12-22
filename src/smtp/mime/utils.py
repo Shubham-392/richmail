@@ -60,10 +60,14 @@ def extractMediaTypes(header_value: str):
         if header_value[i] == ";":
             # Found attributes - extract all of them
             attributeString = header_value[i+1:]
+
             Type = "".join(rawType).strip()
             SubType = "".join(rawSubType).strip()
+
             attributes = extractAttributes(attributeString)
+
             return Type, SubType, attributes
+
         rawSubType.append(header_value[i])
         i += 1
 

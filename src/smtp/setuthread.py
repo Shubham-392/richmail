@@ -4,6 +4,7 @@ from email_validator import EmailNotValidError, validate_email
 
 from src.smtp.db.config import connPool
 from src.smtp.exceptions import QuitLoopException
+from src.smtp.features import serverCommands
 from src.smtp.mime.parser import MIMEParser
 
 from src.smtp.logger.setup import logger
@@ -90,40 +91,28 @@ class ESMTPSession:
     def CommandHandler(
         self, command: str, commandChunk: dict, connSocket: socket.socket
     ):
-        if command == "EHLO":
-            logger.debug(f'Command Identified is : {command}')
-            self.EhloCmdHandler(
+        
+        CommandHandlers = {
+            'EHLO': self.EhloCmdHandler,
+            'RSET': self.RsetCmdHandler,
+            'MAIL': self.MailCmdHandler,
+            'RCPT': self.RcptCmdHandler,
+            'DATA': self.DataCmdHandler, 
+            'QUIT': self.QuitCmdHandler, 
+        }
+        
+        if command in serverCommands:
+            logger.debug(f'Command Identified is: {command}')
+            CmdHandler = CommandHandlers.get(command)
+            CmdHandler(
                 command=command, commandTokens=commandChunk, connSocket=connSocket
             )
-        elif command == "MAIL":
-            logger.debug(f'Command Identified is : {command}')
-            self.MailCmdHandler(
-                command=command, commandTokens=commandChunk, connSocket=connSocket
-            )
-        elif command == "RCPT":
-            logger.debug(f'Command Identified is : {command}')
-            self.RcptCmdHandler(
-                command=command, commandTokens=commandChunk, connSocket=connSocket
-            )
-        elif command == "DATA":
-            logger.debug(f'Command Identified is : {command}')
-            self.DataCmdHandler(
-                command=command, commandTokens=commandChunk, connSocket=connSocket
-            )
-        elif command == "QUIT":
-            logger.debug(f'Command Identified is : {command}')
-            self.QuitCmdHanlder(
-                command=command, commandTokens=commandChunk, connSocket=connSocket
-            )
-        elif command == "RSET":
-            logger.debug(f'Command Identified is : {command}')
-            self.RsetCmdHanlder(
-                command=command, commandTokens=commandChunk, connSocket=connSocket
-            )
+            
         else:
             errorMsg = command
             logger.debug(f'Command not recognised: "{errorMsg}"')
             connSocket.send(errorMsg.encode("utf-8"))
+            
 
     def EhloCmdHandler(
         self,
@@ -426,7 +415,7 @@ class ESMTPSession:
             logger.debug(f'Command out of Order, current state is {self.transcationState}')
             self.SendError(errorCode=503, clientSocket=connSocket)
 
-    def QuitCmdHanlder(
+    def QuitCmdHandler(
         self, command: str, commandTokens: dict, connSocket: socket.socket, timeout: int = 10
     ) -> bool:
         # send response to the client which acknowledges that the
@@ -439,7 +428,7 @@ class ESMTPSession:
             self.SendSuccess(successCode=221, clientSocket=connSocket)
             raise QuitLoopException
 
-    def RsetCmdHanlder(
+    def RsetCmdHandler(
         self, command: str, commandTokens: dict, connSocket: socket, timeout: int = 10
     ) -> bool:
 
