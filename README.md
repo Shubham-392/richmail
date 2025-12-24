@@ -1,5 +1,5 @@
 # Setu e-Mail
-## _Only Mail app with regional languages support_
+## _Only Mail APP with regional languages support_
 
 
 
