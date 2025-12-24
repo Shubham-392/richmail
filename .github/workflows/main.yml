@@ -1,19 +1,19 @@
-name: Deploy to Setu EC2 
+name: Deploy to Setu EC2
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Deploy to Setu API & SMTP
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ secrets.SETU_HOST }}
-        username: ${{ secrets.SETU_USERNAME }}
-        key: ${{ secrets.SETU_KEY }}
-        script: |
-          ./setuscript.sh
+      - name: Deploy to Setu API & SMTP
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SETU_HOST }}
+          username: ${{ secrets.SETU_USERNAME }}
+          key: ${{ secrets.SETU_KEY }}
+          script: |
+            ~/richmail/richmail/setuscript.sh
