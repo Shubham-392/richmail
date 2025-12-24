@@ -23,4 +23,4 @@ Setu is a mail receving MTA accepts mail from outbound servers like gmail, outlo
 
 MIT
 
-**Learning a lot, HELL YEAH**
+**Learning a lot, INTERSETING**
