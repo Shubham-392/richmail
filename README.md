@@ -4,6 +4,7 @@
 
 
 ![Build Status](https://img.shields.io/badge/github-repo-blue?logo=github)
+[![Setu](https://github.com/Shubham-392/richmail/actions/workflows/main.yml/badge.svg)](https://github.com/Shubham-392/richmail/actions/workflows/main.yml)
 
 Setu is a mail receving MTA accepts mail from outbound servers like gmail, outlook, yahoo,etc.
 
