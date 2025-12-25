@@ -14,3 +14,4 @@ session_*.log
 
 # environments
 .env
+mime*.json

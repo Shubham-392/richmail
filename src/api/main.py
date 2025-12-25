@@ -5,6 +5,6 @@ app = FastAPI()
 app.include_router(outbox_router)
 
 
-@app.get("/", tags=['root'])
+@app.get("/setxapi/", tags=['root'])
 async def root():
     return {"message": "Welcome to Setu Mailing Application!"}

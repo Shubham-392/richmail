@@ -5,7 +5,7 @@ from src.smtp.mime.headers import (
     MIMEVersion, MIMEVersionDefault,
     TYPES
 )
-from src.smtp.mime.utils import extractComments, extractMediaTypes
+from src.smtp.mime.utils import  extractComments, extractMediaTypes
 # from src.smtp.logger.setup import logger
 #
 # If boundary is null, we assume that *f is positioned on the start of
@@ -79,6 +79,8 @@ class MIMEParser:
 
 
 
+
+
     def StoreHeaderInfo(
         self,
         header:str,
@@ -90,30 +92,32 @@ class MIMEParser:
     ):
         # Initialize headers dict only if it doesn't exist
         if 'headers' not in self.MIMEInfo:
-            self.MIMEInfo['headers'] = {}
+            self.MIMEInfo['headers'] = {
+                'top':{}
+            }
 
         if header.upper() == MIMEVersion:
-            self.MIMEInfo['headers']['MIME-Version']= {}
-            self.MIMEInfo['headers']['MIME-Version']['name'] = header
-            self.MIMEInfo['headers']['MIME-Version']['version'] = value
+            self.MIMEInfo['headers']['top']['MIME-Version']= {}
+            self.MIMEInfo['headers']['top']['MIME-Version']['name'] = header
+            self.MIMEInfo['headers']['top']['MIME-Version']['version'] = value
             if comments is not None:
-                self.MIMEInfo['headers']['MIME-Version']['comments'] = comments
+                self.MIMEInfo['headers']['top']['MIME-Version']['comments'] = comments
 
         elif header.upper() == FROM:
-            self.MIMEInfo['headers']['From'] = value
+            self.MIMEInfo['headers']['top']['From'] = value
 
         elif header.upper() == TO:
-            self.MIMEInfo['headers']['To'] = value
+            self.MIMEInfo['headers']['top']['To'] = value
         elif header.upper() == SUBJECT:
-            self.MIMEInfo['headers']['Subject'] = value
+            self.MIMEInfo['headers']['top']['Subject'] = value
 
         elif header.upper() == CONTENT_TYPE:
-            self.MIMEInfo['headers']['Content-Type'] = {
+            self.MIMEInfo['headers']['top']['Content-Type'] = {
                 'media':{},
             }
-            self.MIMEInfo['headers']['Content-Type']['media']['type'] = type
-            self.MIMEInfo['headers']['Content-Type']['media']['subtype'] = subType
+            self.MIMEInfo['headers']['top']['Content-Type']['media']['type'] = type
+            self.MIMEInfo['headers']['top']['Content-Type']['media']['subtype'] = subType
 
             # store attributes information
             if attributes:
-                self.MIMEInfo['headers']['Content-Type']['attributes'] = attributes
+                self.MIMEInfo['headers']['top']['Content-Type']['attributes'] = attributes

@@ -104,7 +104,6 @@ def extractAttributes(attributeString: str) -> list:
         # Remove quotes if present
         if value.startswith('"') and value.endswith('"'):
             value = value[1:-1]
-
         if name and value:
             attributes.append({
                 'name': name,
@@ -162,3 +161,25 @@ def extractAttribute(attributeClaim: str) -> tuple[bool, str, str]:
     value = ''.join(rawValue)
 
     return CORRUPTED, variable, value
+
+
+def getBoundary(MIMEInfo: dict):
+    for key in MIMEInfo['headers']['top']['Content-Type'].keys():
+        if key == 'attributes':
+            attributes = MIMEInfo['headers']['top']['Content-Type']['attributes']
+            break
+        else:
+            return None
+
+    if attributes :
+        for attribute in attributes:
+            if attribute['name'].lower() == 'boundary':
+                return attribute['value']
+            else:
+                return None  # no boundary defined on top level treat it as plain text
+    else:
+        return None
+
+
+def setBoundary():
+    ...
