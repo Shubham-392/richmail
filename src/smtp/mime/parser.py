@@ -1,123 +1,114 @@
+from email import policy
+from email.message import EmailMessage
+from email.parser import Parser
+import json
 
-from src.smtp.mime.headers import (
-    CONTENT_TYPE,
-    FROM, SUBJECT, TO,
-    MIMEVersion, MIMEVersionDefault,
-    TYPES
-)
-from src.smtp.mime.utils import  extractComments, extractMediaTypes
-# from src.smtp.logger.setup import logger
-#
-# If boundary is null, we assume that *f is positioned on the start of
-# headers (for example, at the very beginning of a message.  If a boundary is
-# given, we must first advance to it to reach the start of the next header
-# block.
-
-#  NOTE -- there's an error here -- RFC2046 specifically says to
-#  check for outer boundaries.  This code doesn't do that, and
-#  I haven't fixed this.
-#
-#
 
 class MIMEParser:
-    def __init__(self):
-        self.MIMEInfo = {}
+    def __init__(self, email_string: str):
+            self.message = Parser(policy=policy.default).parsestr(email_string)
+            self.parsedData = {
+                'levels':{},
+            }
 
-    def unfoldHeaders(self, lines:list) -> list:
-        currentLine = ""
-        unfoldLines = []
-        for line in lines:
-            if line and (line[0]== " " or line[0] == "\t"):
-                # this is continuation of `currentLine`
-                currentLine += " " + line.strip()
+
+    def parse(self) -> dict:
+        # Extract headers
+        self._extractHeaders()
+
+        # Parse body and attachments
+        # if self.message.is_multipart():
+        self._parseMultipart(msg = self.message)
+        # else:
+        #     self._parsePlain()
+
+        # return self.parsedData
+
+    def _extractHeaders(self):
+        if '0' not in self.parsedData['levels'].keys():
+            self.parsedData['levels']['0'] = {
+                'headers':[]
+            }
+        for key, value in self.message.items():
+            if hasattr(value, 'params'):
+                headerInfo = {
+                    'name':key,
+                    'value':value,
+                    'params': [dict(value.params)]
+                }
             else:
-                # New line
-                if currentLine:
-                    unfoldLines.append(currentLine)
-                currentLine = line
+                headerInfo = {
+                    'name':key,
+                    'value':value
+                }
 
-        # check if currentLine is inserted appropirately
-        if currentLine:
-            unfoldLines.append(currentLine)
-        return unfoldLines
+            self.parsedData['levels']['0']['headers'].append(headerInfo)
 
-    def parse(self, dataBuffer: str):
-        # split per '\n' as in server.py after successfull
-        # CRLF is replaced with '\n' for every new line.
-        lines = dataBuffer.split("\n")
-        lines = self.unfoldHeaders(lines=lines)
-        for line in lines:
-            # ':' indicates header as per syntax of headers in RFC
-            if ":" in line:
-                rawHeader, rawValue = line.split(":", 1)
-                header, value = rawHeader.strip(), rawValue.strip()
+        print(self.parsedData)
 
-                if header.upper() == CONTENT_TYPE:
-                    Type, SubType, attributes= extractMediaTypes(header_value=value)
-                    if Type.upper() in TYPES:
+    def _parseMultipart(self, msg: EmailMessage):
 
-                        self.StoreHeaderInfo(
-                            header=header,
+        if msg.is_multipart():
+            for newLevel, part in enumerate(msg.iter_parts(), 1):
+                # Extract all headers specific to this sub-part
+                for header, value in part.items():
+                    if hasattr(value, 'params'):
+                        self._addHeaders(
+                            level=newLevel,
+                            name=header,
                             value=value,
-                            type=Type,
-                            subType=SubType,
-                            attributes=attributes
+                            params = dict(value.params)
+                        )
+                    else:
+                        self._addHeaders(
+                            level=newLevel,
+                            name = header,
+                            value=value
                         )
 
-                elif header.upper() == MIMEVersion:
-                    if value == MIMEVersionDefault:
-                        self.StoreHeaderInfo(header=header, value=value)
-                    comments, version = extractComments(header_value=value)
-                    self.StoreHeaderInfo(header=header, value=version, comments=comments)
+                content = part.get_content()
+                # handle the decoding of octet-stream
+                # if isinstance(content, bytes):
+                #     try:
+                #         encodedContent = content.decode("utf-8")
+                #         self._addContent(newLevel, encodedContent)
+                #     except UnicodeDecodeError as e:
+                #         print(str(e))
 
-                elif header.upper() == FROM:
-                    self.StoreHeaderInfo(header=header, value=value)
-                elif header.upper() == TO:
-                    self.StoreHeaderInfo(header=header, value=value)
-                elif header.upper() == SUBJECT:
-                    self.StoreHeaderInfo(header=header, value=value)
+                # else:
 
+                self._addContent(newLevel, str(content))
 
+            # print(self.parsedData)
 
-
-
-    def StoreHeaderInfo(
-        self,
-        header:str,
-        value:str = None,
-        comments:list = None,
-        type:str = "plain",
-        subType:str = "text",
-        attributes:list = None,
-    ):
-        # Initialize headers dict only if it doesn't exist
-        if 'headers' not in self.MIMEInfo:
-            self.MIMEInfo['headers'] = {
-                'top':{}
+    def _addHeaders(self, level, name, value, params= None):
+        if params:
+            headerObject = {
+                'name':name,
+                'value':value,
+                'params':[
+                    params
+                ]
+            }
+        else:
+            headerObject = {
+                'name':name,
+                'value':value,
+                'params':params
             }
 
-        if header.upper() == MIMEVersion:
-            self.MIMEInfo['headers']['top']['MIME-Version']= {}
-            self.MIMEInfo['headers']['top']['MIME-Version']['name'] = header
-            self.MIMEInfo['headers']['top']['MIME-Version']['version'] = value
-            if comments is not None:
-                self.MIMEInfo['headers']['top']['MIME-Version']['comments'] = comments
+        if level not in self.parsedData['levels'].keys():
+                self.parsedData['levels'][level] = {'headers': [headerObject]}
+        else:
+            if 'headers' not in self.parsedData['levels'][level].keys():
+                self.parsedData['levels'][level]['headers'] = [headerObject]
+            else:
+                self.parsedData['levels'][level]['headers'].append(headerObject)
+        with open("./value.json", "w") as f:
+            json.dump(self.parsedData, indent=2, fp =f)
 
-        elif header.upper() == FROM:
-            self.MIMEInfo['headers']['top']['From'] = value
 
-        elif header.upper() == TO:
-            self.MIMEInfo['headers']['top']['To'] = value
-        elif header.upper() == SUBJECT:
-            self.MIMEInfo['headers']['top']['Subject'] = value
-
-        elif header.upper() == CONTENT_TYPE:
-            self.MIMEInfo['headers']['top']['Content-Type'] = {
-                'media':{},
-            }
-            self.MIMEInfo['headers']['top']['Content-Type']['media']['type'] = type
-            self.MIMEInfo['headers']['top']['Content-Type']['media']['subtype'] = subType
-
-            # store attributes information
-            if attributes:
-                self.MIMEInfo['headers']['top']['Content-Type']['attributes'] = attributes
+    def _addContent(self, level:int, content):
+        self.parsedData['levels'][level]['content'] = content
+        with open("./value.json", "w") as f:
+            json.dump(self.parsedData, indent=2, fp =f)
