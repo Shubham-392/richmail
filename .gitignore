@@ -16,3 +16,6 @@ session_*.log
 .env
 mime*.json
 value*.json
+content*.html
+content*.txt
+emls/
