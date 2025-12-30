@@ -44,9 +44,9 @@ class MySQLPool:
         res["password"] = self._password
         res["database"] = self._database
         self.dbconfig = res
-        self.pool = self.create_pool(pool_name=pool_name, pool_size=pool_size)
+        self.pool = self._create_pool(pool_name=pool_name, pool_size=pool_size)
 
-    def create_pool(self, pool_name="setu", pool_size=3):
+    def _create_pool(self, pool_name="setu", pool_size=3):
             """
             Create a connection pool, after created, the request of connecting
             MySQL could get a connection from this pool instead of request to
@@ -97,6 +97,10 @@ class MySQLPool:
                 res = cursor.fetchall()
                 self.close(conn, cursor)
                 return res
+            
+    def get_conn(self):
+        conn = self.pool.get_connection()
+        return conn
 
 
 connPool = MySQLPool(**db_config)

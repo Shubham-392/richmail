@@ -29,7 +29,6 @@ async def read_outbox(payload: UserMailModel):
             "success": True,
             "message": "Successfully retrieved outbox mailing list",
             "data": results,
-            "count": len(results),
         }
         return JSONResponse(status_code=status.HTTP_200_OK, content=response)
 
