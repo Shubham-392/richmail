@@ -4,53 +4,6 @@ from email.parser import Parser
 import json
 from pathlib import Path
 
-# from src.smtp.mime.data import Persons
-# {
-#     "message_id": "<unique-id-from-header>",
-#     "metadata": {
-#         "subject": "Project Update",
-#         "from": "sender@example.com",
-#         "to": ["receiver@example.com"],
-#         "date": "2023-10-27T10:00:00Z",
-#         "common_headers": [
-#             {"name": "X-Priority", "value": "3"},
-#             {"name": "Reply-To", "value": "support@example.com"}
-#         ]
-#     },
-#     "structure": {
-#         "main_type": "multipart",
-#         "sub_type": "mixed",
-#         "parts": [
-#             {
-#                 "type": "text/plain",
-#                 "disposition": "inline",
-#                 "content": "Hello, please find the report attached.",
-#                 "charset": "utf-8"
-#             },
-#             {
-#                 "type": "text/html",
-#                 "disposition": "inline",
-#                 "content": "<html><body><p>Hello, please find the <b>report</b> attached.</p></body></html>",
-#                 "charset": "utf-8"
-#             },
-#             {
-#                 "type": "application/pdf",
-#                 "disposition": "attachment",
-#                 "filename": "report_2023.pdf",
-#                 "file_path": "./emls/attachments/eml_report_2023.pdf",
-#                 "content_id": None
-#             },
-#             {
-#                 "type": "image/png",
-#                 "disposition": "inline",
-#                 "filename": "signature.png",
-#                 "file_path": "./emls/inlines/eml_signature.png",
-#                 "content_id": "<sig123@example.com>"
-#             }
-#         ]
-#     }
-# }
-
 
 class MIMEParser:
 
@@ -70,7 +23,7 @@ class MIMEParser:
     def parse(self) -> dict:
         
         # get the main headers first
-        self.parsedData["message_id"] = str(self.message.get("Message-ID", ""))
+        self.parsedData["msg_id"] = str(self.message.get("Message-ID", ""))
         self.parsedData["metadata"] = {
             "subject": str(self.message.get("subject", "")),
             "from": str(self.message.get("from", "")),
@@ -196,10 +149,14 @@ class MIMEParser:
                 self.parsedData['structure']['nodes'].append(partInfo)
 
     def _saveAttachment(self, buffer:bytes, fname:str, disposition:str):
+        msgID = self.parsedData['msg_id']
+        if msgID is not None:
+            
+            basedir = f'./emls/{msgID.strip('<>')}'
         
         filename = f'eml_{fname}'
         if disposition == 'inline':
-            inlinedir = "./emls/inlines/"
+            inlinedir = f"{basedir}/inlines/"
             inlinePath = Path(inlinedir)
             inlinePath.mkdir(parents=True, exist_ok=True)
             
@@ -210,7 +167,7 @@ class MIMEParser:
             
         elif disposition == 'attachment':
             
-            attachdir = "./emls/attachments/"
+            attachdir = f"{basedir}/attachments/"
             dirPath = Path(attachdir)
             
             dirPath.mkdir(parents=True, exist_ok=True)
@@ -224,8 +181,13 @@ class MIMEParser:
    
                 
     def _saveHTMLorTEXT(self, buffer:str, fname:str, type:str=None):
-        templatesPath = "./templates/"
-        textPath = "./texts/"
+        msgID = self.parsedData['msg_id']
+        
+        if msgID is not None:
+            basedir = f'./emls/{msgID.strip('<>')}'
+            
+        templatesPath = f"{basedir}/templates/"
+        textPath = f"{basedir}/texts/"
         if type == 'html':
             Path(templatesPath).mkdir(parents=True, exist_ok=True)
             

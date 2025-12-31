@@ -1,4 +1,4 @@
 from pydantic import BaseModel
 
-class UserMailModel(BaseModel):
-    email: str
+class UserMailModel:
+    email:str

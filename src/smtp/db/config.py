@@ -45,6 +45,10 @@ class MySQLPool:
         res["database"] = self._database
         self.dbconfig = res
         self.pool = self._create_pool(pool_name=pool_name, pool_size=pool_size)
+        
+    def get_conn(self):
+        conn = self.pool.get_connection()
+        return conn
 
     def _create_pool(self, pool_name="setu", pool_size=3):
             """
@@ -98,9 +102,41 @@ class MySQLPool:
                 self.close(conn, cursor)
                 return res
             
-    def get_conn(self):
-        conn = self.pool.get_connection()
-        return conn
+            
+    def executemany(self, sql, seq_args=None, commit=False):
+        """
+        Docstring for executemany
+        
+        :param self: Self@MySQLPool
+        :param sql: SQL clause.
+        :param seq_args: Sequence of arguments.
+        :param commit: Whether to commit in db or not.
+        
+        if no `seq_args` then fallback to execute()
+        """
+        
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        
+        if seq_args:
+            cursor.executemany(sql, seq_args)
+            
+        else:
+            cursor.execute(sql)
+            
+        if commit is True:
+            conn.commit()
+            self.close(conn, cursor)
+            return None
+            
+        else:
+            res = cursor.fetchall()
+            self.close(conn, cursor)
+            return res
+            
+    
+    
+        
 
 
 connPool = MySQLPool(**db_config)
