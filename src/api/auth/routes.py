@@ -48,7 +48,7 @@ async def getTokens(request: Request, payload:UserModel):
         )
         
         
-@router.post("/getTokens/refresh",tags=["Regenerate Access Token"])
+@router.post("/getTokens/refresh/",tags=["Regenerate Access Token"])
 async def token_refresh(payload: TokenRefreshRequest):
     try:
         token_payload = decode_token(payload.refresh_token)

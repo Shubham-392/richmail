@@ -77,7 +77,7 @@ class MySQLPool:
             cursor.close()
             conn.close()
 
-    def execute(self, sql, args=None, commit=False):
+    def execute(self, sql, args=None, commit=False, dictionary=False):
             """
             Execute a sql, it could be with args and with out args. The usage is
             similar with execute() function in module pymysql.
@@ -88,7 +88,7 @@ class MySQLPool:
             """
             # get connection form connection pool instead of create one.
             conn = self.pool.get_connection()
-            cursor = conn.cursor()
+            cursor = conn.cursor(dictionary=dictionary)
             if args:
                 cursor.execute(sql, args)
             else:

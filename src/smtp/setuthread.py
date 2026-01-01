@@ -6,6 +6,7 @@ from src.smtp.db.config import connPool
 from src.smtp.exceptions import QuitLoopException
 from src.smtp.features import serverCommands
 from src.smtp.mime.parser import MIMEParser
+from src.smtp.mime.db import MIMEStore
 
 from src.smtp.logger.setup import logger
 from src.smtp.smtpd import CommandSpecifier
@@ -386,7 +387,9 @@ class ESMTPSession:
                 parser = MIMEParser(email_string=DataCommandBuffer)
                 # # parse message to look if msg is formatted in MIME format
                 logger.debug("Now parsing the message for MIME support")
-                parser.parse()
+                MIMEInfo = parser.parse()
+                store = MIMEStore(MIMEInfo=MIMEInfo)
+                
 
 
                 logger.debug('Inserting the mail transcation in DB')
@@ -396,7 +399,11 @@ class ESMTPSession:
                         receiver=self.mailTranscation[self.mailTranscationObjs[1]],
                         data=self.mailTranscation[self.mailTranscationObjs[2]],
                     )
+                    
+                    saved = store.storeMeta()
 
+                    if saved is None:
+                        logger.debug(f'Unauthorized user detected.:{self.mailTranscation[self.mailTranscationObjs[1]]}')
                     # clear buffers for next transaction
                     self.mailTranscation = {}
 
