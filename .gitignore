@@ -15,5 +15,3 @@ session_*.log
 # environments
 .env
 mime*.json
-value*.json
-emls/

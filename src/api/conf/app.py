@@ -13,3 +13,5 @@ async def lifespan(app: FastAPI):
 
 # FastAPI application using lifespan context manager
 app = FastAPI(lifespan=lifespan)
+
+

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+        }
+
+        /* Login Page */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-box h1 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 24px;
+        }
+
+        .login-box p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            color: #e53e3e;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        /* Inbox Page */
+        .inbox-container {
+            display: none;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+        }
+
+        .inbox-header {
+            background: white;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .inbox-header h1 {
+            font-size: 22px;
+            color: #333;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-email {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+
+        .inbox-content {
+            padding: 20px 30px;
+        }
+
+        .email-list {
+            list-style: none;
+        }
+
+        .email-item {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .email-item:hover {
+            background-color: #f9f9f9;
+        }
+
+        .email-item.unread {
+            background-color: #f0f4ff;
+            font-weight: 600;
+        }
+
+        .email-item.unread:hover {
+            background-color: #e8efff;
+        }
+
+        .email-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+
+        .email-status.unread {
+            background-color: #1a73e8;
+        }
+
+        .email-status.read {
+            background-color: transparent;
+        }
+
+        .email-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .email-sender {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .email-subject {
+            font-size: 13px;
+            color: #5f6368;
+            margin-bottom: 4px;
+        }
+
+        .email-snippet {
+            font-size: 13px;
+            color: #80868b;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-inbox {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-inbox svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .refresh-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .refresh-btn.spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Page -->
+    <div class="login-container" id="loginPage">
+        <div class="login-box">
+            <h1>Sign In</h1>
+            <p>Access your inbox</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" required placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required placeholder="Enter your password">
+                </div>
+                <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
+                <div class="error-message" id="errorMessage"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Inbox Page -->
+    <div class="inbox-container" id="inboxPage">
+        <div class="inbox-header">
+            <h1>Inbox</h1>
+            <div class="user-info">
+                <span class="user-email" id="userEmail"></span>
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+        </div>
+        <div class="inbox-content">
+            <div class="loading" id="loading">Loading your emails...</div>
+            <ul class="email-list" id="emailList"></ul>
+            <div class="empty-inbox" id="emptyInbox" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                </svg>
+                <h2>No emails yet</h2>
+                <p>Your inbox is empty</p>
+            </div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" id="refreshBtn" style="display: none;" title="Refresh inbox">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+        </svg>
+    </button>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+let accessToken = localStorage.getItem('accessToken'); // Initialize from storage
+let userEmail = localStorage.getItem('userEmail');
+
+// 1. Check for existing session on page load
+window.addEventListener('DOMContentLoaded', async () => {
+    const savedRefreshToken = localStorage.getItem('refreshToken');
+    
+    if (savedRefreshToken && userEmail) {
+        // Show the UI immediately if we have data
+        showInbox();
+        
+        // Try to load emails. fetchWithAuth will handle refreshing 
+        // the token if the current accessToken is expired.
+        try {
+            await loadEmails();
+        } catch (error) {
+            console.error("Initial load failed:", error);
+            logout(); // Final fallback if refresh fails
+        }
+    }
+});
+
+// 2. Refresh Access Token
+async function refreshAccessToken() {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (!refreshToken) return false;
+
+    try {
+        const response = await fetch(`${API_BASE}/getTokens/refresh/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.accessToken) {
+            accessToken = data.accessToken;
+            localStorage.setItem('accessToken', accessToken); // Persist the new token
+            return true;
+        } else {
+            return false;
+        }
+    } catch (error) {
+        console.error('Token refresh failed:', error);
+        return false;
+    }
+}
+
+// 3. Fetch wrapper with automatic token refresh
+async function fetchWithAuth(url, options = {}) {
+    if (!accessToken) {
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) throw new Error('No valid session');
+    }
+
+    const headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${accessToken}`
+    };
+
+    let response = await fetch(url, { ...options, headers });
+
+    // If token expired (401), refresh and retry once
+    if (response.status === 401) {
+        const tokenRefreshed = await refreshAccessToken();
+        if (tokenRefreshed) {
+            headers['Authorization'] = `Bearer ${accessToken}`;
+            response = await fetch(url, { ...options, headers });
+        } else {
+            logout();
+            throw new Error('Session expired. Please login again.');
+        }
+    }
+
+    return response;
+}
+
+// 4. Load Emails (Updated to use fetchWithAuth)
+async function loadEmails() {
+    const loading = document.getElementById('loading');
+    const emailList = document.getElementById('emailList');
+    const emptyInbox = document.getElementById('emptyInbox');
+    
+    loading.style.display = 'block';
+    emailList.innerHTML = '';
+    emptyInbox.style.display = 'none';
+
+    try {
+        // CRITICAL FIX: Use fetchWithAuth instead of raw fetch
+        const response = await fetchWithAuth(`${API_BASE}/inbox/`);
+        const data = await response.json();
+
+        loading.style.display = 'none';
+
+        if (data.success && data.emails && data.emails.length > 0) {
+            data.emails.forEach(email => {
+                const li = document.createElement('li');
+                li.className = `email-item ${email.is_readed ? 'read' : 'unread'}`;
+                li.innerHTML = `
+                    <div class="email-status ${email.is_readed ? 'read' : 'unread'}"></div>
+                    <div class="email-details">
+                        <div class="email-sender">${escapeHtml(email.sender_email)}</div>
+                        <div class="email-subject">${escapeHtml(email.subject || '(no subject)')}</div>
+                        <div class="email-snippet">${escapeHtml(email.message_snippet || '')}</div>
+                    </div>
+                `;
+                emailList.appendChild(li);
+            });
+        } else {
+            emptyInbox.style.display = 'block';
+        }
+    } catch (error) {
+        loading.style.display = 'none';
+        emailList.innerHTML = `<div class="error-message">${error.message}</div>`;
+    }
+}
+
+// 5. Login Form Handler
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const loginBtn = document.getElementById('loginBtn');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Signing in...';
+    errorMessage.textContent = '';
+
+    try {
+        const response = await fetch(`${API_BASE}/getTokens/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (data.accessToken && data.refreshToken) {
+            accessToken = data.accessToken;
+            userEmail = email;
+            
+            // Save everything to localStorage
+            localStorage.setItem('accessToken', accessToken);
+            localStorage.setItem('refreshToken', data.refreshToken);
+            localStorage.setItem('userEmail', email);
+            
+            showInbox();
+            loadEmails();
+        } else {
+            errorMessage.textContent = data.message || 'Invalid credentials.';
+        }
+    } catch (error) {
+        errorMessage.textContent = 'Connection error. Is the server running?';
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Sign In';
+    }
+});
+
+// 6. Logout function
+function logout() {
+    accessToken = null;
+    userEmail = null;
+    localStorage.clear();
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('inboxPage').style.display = 'none';
+    document.getElementById('refreshBtn').style.display = 'none';
+}
+
+document.getElementById('logoutBtn').addEventListener('click', logout);
+
+// 7. Helper functions
+function showInbox() {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('inboxPage').style.display = 'block';
+    document.getElementById('refreshBtn').style.display = 'flex';
+    document.getElementById('userEmail').textContent = userEmail;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadEmails);
+
+    </script>
+</body>
+</html>

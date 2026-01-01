@@ -6,6 +6,7 @@ from src.smtp.db.config import connPool
 from src.smtp.exceptions import QuitLoopException
 from src.smtp.features import serverCommands
 from src.smtp.mime.parser import MIMEParser
+from src.smtp.mime.db import MIMEStore
 
 from src.smtp.logger.setup import logger
 from src.smtp.smtpd import CommandSpecifier
@@ -383,10 +384,12 @@ class ESMTPSession:
                 # store in transaction
                 self.mailTranscation[self.mailTranscationObjs[2]] = DataCommandBuffer
                 # create object for MIME parser initialization
-                parser = MIMEParser()
-                # parse message to look if msg is formatted in MIME format
+                parser = MIMEParser(email_string=DataCommandBuffer)
+                # # parse message to look if msg is formatted in MIME format
                 logger.debug("Now parsing the message for MIME support")
-                parser.parse(dataBuffer=DataCommandBuffer)
+                MIMEInfo = parser.parse()
+                store = MIMEStore(MIMEInfo=MIMEInfo)
+                
 
 
                 logger.debug('Inserting the mail transcation in DB')
@@ -396,7 +399,11 @@ class ESMTPSession:
                         receiver=self.mailTranscation[self.mailTranscationObjs[1]],
                         data=self.mailTranscation[self.mailTranscationObjs[2]],
                     )
+                    
+                    saved = store.storeMeta()
 
+                    if saved is None:
+                        logger.debug(f'Unauthorized user detected.:{self.mailTranscation[self.mailTranscationObjs[1]]}')
                     # clear buffers for next transaction
                     self.mailTranscation = {}
 
@@ -561,17 +568,13 @@ class ESMTPSession:
         logger.debug(f'State is updated to: {self.transcationState}')
 
     def Insert(self, sender, receiver, data):
-        add_mail = "INSERT INTO setu_outbox(sender, receiver, data) VALUES "
-        receiverList = len(receiver)
-        for recv in range(receiverList):
-            if recv < (receiverList - 1):
-                add_mail += "('%s', '%s', '%s')," % (sender, receiver[recv],data)
-            else:
-                add_mail += "('%s', '%s', '%s')" % (sender, receiver[recv], data)
-
-        logger.debug(f'SQL query for Inserting data: {add_mail}')
+        
+        # Inserting many rows as per receiver list length.
+        insertQuery = "INSERT INTO setu_outbox(sender, receiver, data) VALUES (%s, %s, %s) "
+        argSequence = [(sender, recv, data) for recv in receiver]
 
         try:
-            connPool.execute(add_mail, commit=True)
+            connPool.executemany(sql=insertQuery, seq_args=argSequence, commit=True)
         except mysql.connector.PoolError :
             raise
+        

@@ -44,9 +44,13 @@ class MySQLPool:
         res["password"] = self._password
         res["database"] = self._database
         self.dbconfig = res
-        self.pool = self.create_pool(pool_name=pool_name, pool_size=pool_size)
+        self.pool = self._create_pool(pool_name=pool_name, pool_size=pool_size)
+        
+    def get_conn(self):
+        conn = self.pool.get_connection()
+        return conn
 
-    def create_pool(self, pool_name="setu", pool_size=3):
+    def _create_pool(self, pool_name="setu", pool_size=3):
             """
             Create a connection pool, after created, the request of connecting
             MySQL could get a connection from this pool instead of request to
@@ -73,7 +77,7 @@ class MySQLPool:
             cursor.close()
             conn.close()
 
-    def execute(self, sql, args=None, commit=False):
+    def execute(self, sql, args=None, commit=False, dictionary=False):
             """
             Execute a sql, it could be with args and with out args. The usage is
             similar with execute() function in module pymysql.
@@ -84,7 +88,7 @@ class MySQLPool:
             """
             # get connection form connection pool instead of create one.
             conn = self.pool.get_connection()
-            cursor = conn.cursor()
+            cursor = conn.cursor(dictionary=dictionary)
             if args:
                 cursor.execute(sql, args)
             else:
@@ -97,6 +101,42 @@ class MySQLPool:
                 res = cursor.fetchall()
                 self.close(conn, cursor)
                 return res
+            
+            
+    def executemany(self, sql, seq_args=None, commit=False):
+        """
+        Docstring for executemany
+        
+        :param self: Self@MySQLPool
+        :param sql: SQL clause.
+        :param seq_args: Sequence of arguments.
+        :param commit: Whether to commit in db or not.
+        
+        if no `seq_args` then fallback to execute()
+        """
+        
+        conn = self.get_conn()
+        cursor = conn.cursor()
+        
+        if seq_args:
+            cursor.executemany(sql, seq_args)
+            
+        else:
+            cursor.execute(sql)
+            
+        if commit is True:
+            conn.commit()
+            self.close(conn, cursor)
+            return None
+            
+        else:
+            res = cursor.fetchall()
+            self.close(conn, cursor)
+            return res
+            
+    
+    
+        
 
 
 connPool = MySQLPool(**db_config)

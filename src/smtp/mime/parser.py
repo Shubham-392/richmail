@@ -1,123 +1,229 @@
+from email import policy
+from email.message import EmailMessage, MIMEPart
+from email.parser import Parser
+import json
+from pathlib import Path
 
-from src.smtp.mime.headers import (
-    CONTENT_TYPE,
-    FROM, SUBJECT, TO,
-    MIMEVersion, MIMEVersionDefault,
-    TYPES
-)
-from src.smtp.mime.utils import  extractComments, extractMediaTypes
-# from src.smtp.logger.setup import logger
-#
-# If boundary is null, we assume that *f is positioned on the start of
-# headers (for example, at the very beginning of a message.  If a boundary is
-# given, we must first advance to it to reach the start of the next header
-# block.
-
-#  NOTE -- there's an error here -- RFC2046 specifically says to
-#  check for outer boundaries.  This code doesn't do that, and
-#  I haven't fixed this.
-#
-#
 
 class MIMEParser:
-    def __init__(self):
-        self.MIMEInfo = {}
 
-    def unfoldHeaders(self, lines:list) -> list:
-        currentLine = ""
-        unfoldLines = []
-        for line in lines:
-            if line and (line[0]== " " or line[0] == "\t"):
-                # this is continuation of `currentLine`
-                currentLine += " " + line.strip()
-            else:
-                # New line
-                if currentLine:
-                    unfoldLines.append(currentLine)
-                currentLine = line
-
-        # check if currentLine is inserted appropirately
-        if currentLine:
-            unfoldLines.append(currentLine)
-        return unfoldLines
-
-    def parse(self, dataBuffer: str):
-        # split per '\n' as in server.py after successfull
-        # CRLF is replaced with '\n' for every new line.
-        lines = dataBuffer.split("\n")
-        lines = self.unfoldHeaders(lines=lines)
-        for line in lines:
-            # ':' indicates header as per syntax of headers in RFC
-            if ":" in line:
-                rawHeader, rawValue = line.split(":", 1)
-                header, value = rawHeader.strip(), rawValue.strip()
-
-                if header.upper() == CONTENT_TYPE:
-                    Type, SubType, attributes= extractMediaTypes(header_value=value)
-                    if Type.upper() in TYPES:
-
-                        self.StoreHeaderInfo(
-                            header=header,
-                            value=value,
-                            type=Type,
-                            subType=SubType,
-                            attributes=attributes
-                        )
-
-                elif header.upper() == MIMEVersion:
-                    if value == MIMEVersionDefault:
-                        self.StoreHeaderInfo(header=header, value=value)
-                    comments, version = extractComments(header_value=value)
-                    self.StoreHeaderInfo(header=header, value=version, comments=comments)
-
-                elif header.upper() == FROM:
-                    self.StoreHeaderInfo(header=header, value=value)
-                elif header.upper() == TO:
-                    self.StoreHeaderInfo(header=header, value=value)
-                elif header.upper() == SUBJECT:
-                    self.StoreHeaderInfo(header=header, value=value)
+    def __init__(self, email_string: str):
+            self.message = Parser(policy=policy.default).parsestr(email_string)
+            self.parsedData = {
+                "message_id": "",
+                "metadata": {},
+                "structure": {
+                    "main_type": "",
+                    "sub_type": "",
+                    "nodes": []
+                }
+        }
 
 
+    def parse(self) -> dict:
+        
+        # get the main headers first
+        self.parsedData["msg_id"] = str(self.message.get("Message-ID", ""))
+        self.parsedData["metadata"] = {
+            "subject": str(self.message.get("subject", "")),
+            "from": str(self.message.get("from", "")),
+            "to": str(self.message.get("to", "")),
+            "date": str(self.message.get("date", "")),
+            "common_headers": self._extractHeaders()
+        }
+
+        # 2. Extract Structure info
+        self.parsedData["structure"]["main_type"] = self.message.get_content_maintype()
+        self.parsedData["structure"]["sub_type"] = self.message.get_content_subtype()
+
+        # Parse body and attachments
+        # if self.message.is_multipart():
+        self._parseMultipart(msg = self.message)
+        # else:
+        #     self._parsePlain()
+
+        # return self.parsedData
+        with open("./value.json", "w") as f:
+            json.dump(self.parsedData, indent=2, default=str ,fp =f)
+            
+        return self.parsedData
+
+    def _extractHeaders(self):
+        headers = []
+        # get most general headers first 
+        skip_header = {'subject', 'from', 'to', 'date', 'message-id'}
+        for key, value in self.message.items():
+            if key.lower() not in skip_header:
+                headers.append({"name": key, "value": str(value)})
+        return headers
+
+    def _parseMultipart(self, msg: EmailMessage):
+
+        if msg.is_multipart():
+            for _ , part in enumerate(msg.iter_parts(), 1):
+                # multipart/* are just containers
+                if part.get_content_maintype() == 'multipart':
+                    continue
+
+                content_type = part.get_content_type()
+                filename = part.get_filename()
+                content_id = part.get("Content-ID")
+                contentSubtype = part.get_content_subtype()
+                contentDisposition = part.get_content_disposition()
+                
+                partInfo = {
+                    "type": content_type,
+                    "filename": filename,
+                    "content_id": content_id,
+                    "charset": part.get_content_charset()
+                }
+                
+
+                if contentSubtype.lower() == "html":
+                    try:
+                        htmlContent = part.get_content()
+                        # charset = part.get_content_charset
+                        encodedHTMLContent = htmlContent
+                        sender = self.parsedData['metadata']['from']
+                        # content is not in bytes
+                        if not isinstance(encodedHTMLContent, bytes):
+                            # content may be string.
+                            if isinstance(encodedHTMLContent, str):
+                                # finally save the html content successfully.
+                                partInfo['content'] = encodedHTMLContent
+                                
+                                saved, storedPath = self._saveHTMLorTEXT(
+                                    buffer=encodedHTMLContent,
+                                    type='html',
+                                    fname = (sender.split('@')[0] + ".html")
+                                )
+                                
+                                if saved and storedPath:
+                                    partInfo['storedPath'] = storedPath 
+                                    print('saved html content')
+                                else:
+                                    print('problem got while saving')
+                                
+                    except Exception as e:
+                        print(str(e))
+
+                elif contentSubtype.lower() == 'plain':
+                    try:
+                        textContent = part.get_content()
+                        sender = self.parsedData['metadata']['from']
+                        # content is not in bytes
+                        if not isinstance(textContent, bytes):
+                            # content may be string.
+                            if isinstance(textContent, str):
+                                # finally save the html content successfully.
+                                partInfo['content'] = textContent
+                                saved, savedPath = self._saveHTMLorTEXT(
+                                    buffer=textContent,
+                                    type='plain',
+                                    fname = (sender.split('@')[0] + ".txt")
+                                )
+                                
+                                if saved and savedPath:
+                                    partInfo['storedPath'] = savedPath
+                                    print('saved plain text content')
+                                else:
+                                    print('problem got while saving')
+                    except Exception as e:
+                        print(str(e))
 
 
+                elif contentDisposition is not None:
+                    partInfo['disposition'] = contentDisposition
+                    content = self._cleanContent(part)
+                    disposition = contentDisposition.lower()
+                    if isinstance(content, bytes):
+                            # filename already contains the extension in name.
+                            # write to server file as eml_{filename} 
+                            
+                            partInfo['content'] = content
+                            savedPath = self._saveAttachment(buffer=content, fname=filename, disposition=disposition)
+                            if savedPath is not None:
+                                partInfo['storedPath'] = savedPath
+                            
+                # save the information finally in dictionary
+                self.parsedData['structure']['nodes'].append(partInfo)
 
-    def StoreHeaderInfo(
-        self,
-        header:str,
-        value:str = None,
-        comments:list = None,
-        type:str = "plain",
-        subType:str = "text",
-        attributes:list = None,
-    ):
-        # Initialize headers dict only if it doesn't exist
-        if 'headers' not in self.MIMEInfo:
-            self.MIMEInfo['headers'] = {
-                'top':{}
-            }
+    def _saveAttachment(self, buffer:bytes, fname:str, disposition:str):
+        msgID = self.parsedData['msg_id']
+        if msgID is not None:
+            
+            basedir = f'./emls/{msgID.strip('<>')}'
+        
+        filename = f'eml_{fname}'
+        if disposition == 'inline':
+            inlinedir = f"{basedir}/inlines/"
+            inlinePath = Path(inlinedir)
+            inlinePath.mkdir(parents=True, exist_ok=True)
+            
+            with open(f'{inlinedir}/{filename}', "wb") as writable:
+                writable.write(buffer)
+                
+            return f'{inlinedir}/{filename}'
+            
+        elif disposition == 'attachment':
+            
+            attachdir = f"{basedir}/attachments/"
+            dirPath = Path(attachdir)
+            
+            dirPath.mkdir(parents=True, exist_ok=True)
+        
+            with open(f'{attachdir}/{filename}', "wb") as writable:
+                writable.write(buffer)
+            
+            return f'{attachdir}/{filename}'
+        
+        return None
+   
+                
+    def _saveHTMLorTEXT(self, buffer:str, fname:str, type:str=None):
+        msgID = self.parsedData['msg_id']
+        
+        if msgID is not None:
+            basedir = f'./emls/{msgID.strip('<>')}'
+            
+        templatesPath = f"{basedir}/templates/"
+        textPath = f"{basedir}/texts/"
+        if type == 'html':
+            Path(templatesPath).mkdir(parents=True, exist_ok=True)
+            
+            with open(f'{templatesPath}/{fname}', "w", encoding='utf-8') as html:
+                html.write(buffer)
+                
+            return True, f'{textPath}/{fname}'
+        
+        elif type == 'plain':
+            Path(textPath).mkdir(parents=True, exist_ok=True)
+            
+            with open(f'{textPath}/{fname}', "w", encoding='utf-8') as html:
+                html.write(buffer)
+                
+            return True, f'{textPath}/{fname}'
+                
+        else:
+            return False, ""
+            
+            
+            
 
-        if header.upper() == MIMEVersion:
-            self.MIMEInfo['headers']['top']['MIME-Version']= {}
-            self.MIMEInfo['headers']['top']['MIME-Version']['name'] = header
-            self.MIMEInfo['headers']['top']['MIME-Version']['version'] = value
-            if comments is not None:
-                self.MIMEInfo['headers']['top']['MIME-Version']['comments'] = comments
+    def _cleanContent(self, part:MIMEPart):
+        # this method is highly RFC Compliant
+        # means it trusts the header
+        # there is no HANDLING FOR MIME sniffing or deep MIME sniffing
 
-        elif header.upper() == FROM:
-            self.MIMEInfo['headers']['top']['From'] = value
+        try:
+            rawContent = part.get_content()
 
-        elif header.upper() == TO:
-            self.MIMEInfo['headers']['top']['To'] = value
-        elif header.upper() == SUBJECT:
-            self.MIMEInfo['headers']['top']['Subject'] = value
+            if isinstance(rawContent, str):
+                return rawContent
 
-        elif header.upper() == CONTENT_TYPE:
-            self.MIMEInfo['headers']['top']['Content-Type'] = {
-                'media':{},
-            }
-            self.MIMEInfo['headers']['top']['Content-Type']['media']['type'] = type
-            self.MIMEInfo['headers']['top']['Content-Type']['media']['subtype'] = subType
+            elif isinstance(rawContent, bytes):
+                return rawContent
 
-            # store attributes information
-            if attributes:
-                self.MIMEInfo['headers']['top']['Content-Type']['attributes'] = attributes
+        except Exception :
+            return part.get_payload(decode=True)
+        
