@@ -133,6 +133,9 @@ class MySQLPool:
             res = cursor.fetchall()
             self.close(conn, cursor)
             return res
+        
+        
+        
             
     
     

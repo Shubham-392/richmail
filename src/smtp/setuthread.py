@@ -2,7 +2,6 @@ import socket
 import mysql.connector
 from email_validator import EmailNotValidError, validate_email
 
-from src.smtp.db.config import connPool
 from src.smtp.exceptions import QuitLoopException
 from src.smtp.features import serverCommands
 from src.smtp.mime.parser import MIMEParser
@@ -10,6 +9,7 @@ from src.smtp.mime.db import MIMEStore
 
 from src.smtp.logger.setup import logger
 from src.smtp.smtpd import CommandSpecifier
+from src.smtp.utils import Insert
 
 
 version = "1.0.0"
@@ -53,7 +53,8 @@ class ESMTPSession:
 
     def sendGreet(self, greetCode=220, softwareAndVersion=softwareAndVersion) -> bytes:
         """return greeting in bytes"""
-        greeting = f"{greetCode} {softwareAndVersion} Service ready\r\n"
+        greeting = f"{greetCode}-{softwareAndVersion} Service ready\r\n"
+        greeting += f'250 8BITMIME'
         greeting = greeting.encode(encoding="utf-8")
         return greeting
 
@@ -126,7 +127,7 @@ class ESMTPSession:
     ):
         if len(commandTokens) > 2:
             logger.debug(f'Unrecognised part from command is: {' '.join(commandTokens[2:])}')
-            self.SendError(errorCode=501, clientSocket=connSocket)
+            self.SendError(errorCode=501, clientSocket=connSocket, localRset=True)
 
         else:
             self.SendSuccess(successCode=250, clientSocket=connSocket)
@@ -152,12 +153,14 @@ class ESMTPSession:
                 )
             else:
                 logger.debug(f'Unrecognised part: {normalizedCommandToken}')
-                self.SendError(errorCode=555, clientSocket=connSocket)
+                self.SendError(errorCode=555, clientSocket=connSocket, localRset=True)
+                
+                
         elif commandTokensCount == 3:
             normalizedCommandToken = commandTokens[1].lower()
             if not normalizedCommandToken.startswith("from:"):
                 logger.debug(f'Unrecognised part: {normalizedCommandToken}')
-                self.SendError(errorCode=555, clientSocket=connSocket)
+                self.SendError(errorCode=555, clientSocket=connSocket, localRset=True)
             else:
                 reversePath = commandTokens[2]
                 self.HandleReversePath(
@@ -167,7 +170,7 @@ class ESMTPSession:
                 )
         else:
             logger.debug(f"Unrecognised part is: {" ".join(commandTokens)}")
-            self.SendError(errorCode=555, clientSocket=connSocket)
+            self.SendError(errorCode=555, clientSocket=connSocket, localRset=True)
 
 
     def HandleReversePath(
@@ -210,15 +213,15 @@ class ESMTPSession:
                     self.UpdateState(command=command)
 
                 except EmailNotValidError:
-                    self.SendError(errorCode=550, clientSocket=connSocket)
+                    self.SendError(errorCode=550, clientSocket=connSocket, localRset=True)
 
                 except Exception:
-                    self.SendError(errorCode=550, clientSocket=connSocket)
+                    self.SendError(errorCode=550, clientSocket=connSocket, localRset=True)
 
             else:
-                self.SendError(errorCode=553, clientSocket=connSocket)
+                self.SendError(errorCode=553, clientSocket=connSocket, localRset=True)
         else:
-            self.SendError(errorCode=555, clientSocket=connSocket)
+            self.SendError(errorCode=555, clientSocket=connSocket, localRset=True)
 
 
 
@@ -244,12 +247,13 @@ class ESMTPSession:
                     )
                 else:
                     logger.debug(f'Unrecognised part: {normalizedCommandToken}')
-                    self.SendError(errorCode=501, clientSocket=connSocket)
+                    self.SendError(errorCode=501, clientSocket=connSocket, localRset=True)
+                    
             elif commandTokensCount == 3:
                 normalizedCommandToken = commandTokens[1].lower()
                 if not normalizedCommandToken.startswith("to:"):
                     logger.debug(f'Unrecognised part: {normalizedCommandToken}')
-                    self.SendError(errorCode=555, clientSocket=connSocket)
+                    self.SendError(errorCode=555, clientSocket=connSocket, localRset=True)
                 else:
                     forwardPath = commandTokens[2]
                     self.HandleForwardPath(
@@ -259,12 +263,12 @@ class ESMTPSession:
                     )
             else:
                 logger.debug(f"Unrecognised part is: {" ".join(commandTokens)}")
-                self.SendError(errorCode=555, clientSocket=connSocket)
+                self.SendError(errorCode=555, clientSocket=connSocket, localRset=True)
 
 
         else:
             logger.debug(f'Command out of order, previous state:{self.transcationState}')
-            self.SendError(errorCode=503, clientSocket=connSocket)
+            self.SendError(errorCode=503, clientSocket=connSocket, localRset=True)
 
 
     def HandleForwardPath(
@@ -325,18 +329,20 @@ class ESMTPSession:
 
                 except EmailNotValidError:
                     logger.debug(f'Email Not Valid: {recipientMailAddress}')
-                    self.SendError(errorCode=550, clientSocket=connSocket)
+                    self.SendError(errorCode=550, clientSocket=connSocket, localRset=True)
+                    # after permanent error update state to 'INIT'
+                    self.transcationState='INIT'
 
-                except Exception :
-                    logger.exception("Exception Occured")
-                    self.SendError(errorCode=550, clientSocket=connSocket)
+                except Exception as e :
+                    logger.exception(f"Exception Occured: {str(e)}")
+                    self.SendError(errorCode=550, clientSocket=connSocket, localRset=True)
             else:
                 logger.debug("Empty recipient forward path")
-                self.SendError(errorCode=553, clientSocket=connSocket)
+                self.SendError(errorCode=553, clientSocket=connSocket, localRset=True)
 
         else:
             logger.debug(f'Not valid way to enter Forward Path: {forwardPath}')
-            self.SendError(errorCode=501, clientSocket=connSocket)
+            self.SendError(errorCode=501, clientSocket=connSocket, localRset=True)
 
 
     def DataCmdHandler(
@@ -394,35 +400,42 @@ class ESMTPSession:
 
                 logger.debug('Inserting the mail transcation in DB')
                 try:
-                    self.Insert(
-                        sender=self.mailTranscation[self.mailTranscationObjs[0]],
-                        receiver=self.mailTranscation[self.mailTranscationObjs[1]],
-                        data=self.mailTranscation[self.mailTranscationObjs[2]],
-                    )
+                    sender=self.mailTranscation[self.mailTranscationObjs[0]]
+                    receiver=self.mailTranscation[self.mailTranscationObjs[1]]
+                    data=self.mailTranscation[self.mailTranscationObjs[2]]
+                    
+                    rawInsert = Insert(sender, receiver=receiver, data=data)
+                    if rawInsert:
+                        logger.debug("Inserted the raw return-path buffer, forward path buffer and the raw MIME or plain text.")
                     
                     saved = store.storeMeta()
 
                     if saved is None:
                         logger.debug(f'Unauthorized user detected.:{self.mailTranscation[self.mailTranscationObjs[1]]}')
-                    # clear buffers for next transaction
-                    self.mailTranscation = {}
+                        self.SendError(errorCode=550, clientSocket=connSocket,localRset=True)
+                      
+                    else:
+                        # clear buffers for next transaction
+                        self.mailTranscation = {}
+                        self.transcationState = 'INIT'
 
-                    self.SendSuccess(successCode=250, clientSocket=connSocket)
+                        # send succcess message to the client 
+                        self.SendSuccess(successCode=250, clientSocket=connSocket)
+                        
                 except mysql.connector.PoolError :
                     logger.debug("Conenction pool is at it's max")
-                    self.SendError(errorCode=451, clientSocket=connSocket)
+                    self.SendError(errorCode=451, clientSocket=connSocket, localRset=True)
 
                     # Clear transaction so it doesn't interfere with next attempt
                     self.mailTranscation = {}
 
-                except Exception :
+                except Exception as e:
                     # Other database errors - send 451 (temporary failure)
-                    logger.exception("Database Error")
-                    self.SendError(errorCode=451, clientSocket=connSocket)
-                    self.mailTranscation = {}
+                    logger.exception(f"Database Error: {str(e)}")
+                    self.SendError(errorCode=451, clientSocket=connSocket, localRset=True)
         else:
             logger.debug(f'Command out of Order, current state is {self.transcationState}')
-            self.SendError(errorCode=503, clientSocket=connSocket)
+            self.SendError(errorCode=503, clientSocket=connSocket, localRset=True)
 
     def QuitCmdHandler(
         self, command: str, commandTokens: dict, connSocket: socket.socket, timeout: int = 10
@@ -434,12 +447,18 @@ class ESMTPSession:
             self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
-            self.SendSuccess(successCode=221, clientSocket=connSocket)
-            raise QuitLoopException
+            clearedStateAndBuffer = self.localRset()
+            if clearedStateAndBuffer:
+                self.SendSuccess(successCode=221, clientSocket=connSocket)
+                raise QuitLoopException
 
     def RsetCmdHandler(
-        self, command: str, commandTokens: dict, connSocket: socket, timeout: int = 10
-    ) -> bool:
+        self, 
+        command: str, 
+        commandTokens: dict, 
+        connSocket: socket, 
+        timeout: int = 10
+    ):
 
         """
         RSET
@@ -448,7 +467,7 @@ class ESMTPSession:
 
         Any stored sender, recipients, and mail data MUST be discarded, and all buffers and state tables cleared.
 
-        MUST send a `250 OK ` reply to a RSET command with no arguments.
+        MUST send a `250 OK` reply to a RSET command with no arguments.
 
 
         """
@@ -457,10 +476,9 @@ class ESMTPSession:
             self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
-            self.mailTranscation = {}
-            self.UpdateState(command=command)
-            logger.debug("Cleared all transcation buffers and state updated to 'INIT'")
-            self.SendSuccess(successCode=250, clientSocket=connSocket)
+            rsetClearedBuffer = self.localRset()
+            if rsetClearedBuffer:
+                self.SendSuccess(successCode=250, clientSocket=connSocket)
 
 
     def NoopCmdHandler(
@@ -478,7 +496,7 @@ class ESMTPSession:
 
         if len(commandTokens) != 1:
             logger.debug(f'Unable to recognize these parts: {" ".join(commandTokens[1:])}')
-            self.SendError(errorCode=501, clientSocket=connSocket)
+            self.SendError(errorCode=455, clientSocket=connSocket)
 
         else:
             self.SendSuccess(
@@ -486,14 +504,18 @@ class ESMTPSession:
                 clientSocket=connSocket
             )
 
-
-
-
     def SendError(self,
         errorCode: int,
         clientSocket: socket.socket,
         errorMsg = None,
+        localRset:bool = False,
     ):
+        if localRset:
+            localRsetCheck = self.localRset()
+            if localRsetCheck:
+                logger.debug("Local RSET performed: Buffers cleared and state reset.")
+        
+        
         if errorCode == 451:
             if not errorMsg:
                 errorMsg = f"{errorCode} Requested action aborted: local error in processing\r\n"
@@ -566,15 +588,8 @@ class ESMTPSession:
     def UpdateState(self, command: str):
         self.transcationState = self.preCommandStates[command]
         logger.debug(f'State is updated to: {self.transcationState}')
-
-    def Insert(self, sender, receiver, data):
-        
-        # Inserting many rows as per receiver list length.
-        insertQuery = "INSERT INTO setu_outbox(sender, receiver, data) VALUES (%s, %s, %s) "
-        argSequence = [(sender, recv, data) for recv in receiver]
-
-        try:
-            connPool.executemany(sql=insertQuery, seq_args=argSequence, commit=True)
-        except mysql.connector.PoolError :
-            raise
-        
+  
+    def localRset(self) -> bool :
+        self.transcationState = 'INIT'
+        self.mailTranscation = {}
+        return True
