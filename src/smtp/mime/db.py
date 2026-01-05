@@ -5,7 +5,7 @@ class MIMEStore:
     def __init__(self, MIMEInfo):
         self.MIMEInfo = MIMEInfo
         
-    def storeMeta(self):
+    def storeMeta(self) -> bool:
         metadata:dict = self.MIMEInfo['metadata']
         nodes:list = self.MIMEInfo['structure']['nodes']
         
@@ -26,7 +26,7 @@ class MIMEStore:
             result = connPool.execute(sql=sql, args=(receiver,), dictionary=True)
             if not result:
                 print(f"There are no result for the email :{receiver}")
-                return None
+                return False
                 
             user_id = result[0]['user_id']
             
@@ -47,9 +47,11 @@ class MIMEStore:
             args = (user_id, message_id, sender, subject, body, html)
                 
             connPool.execute(sql=insertSQL, args= args, commit=True)
+            return True
                 
         except Exception as e:
             print(f'Got problem in DB operation: {str(e)}')
+            return False
             
         
         

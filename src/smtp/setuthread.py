@@ -53,8 +53,7 @@ class ESMTPSession:
 
     def sendGreet(self, greetCode=220, softwareAndVersion=softwareAndVersion) -> bytes:
         """return greeting in bytes"""
-        greeting = f"{greetCode}-{softwareAndVersion} Service ready\r\n"
-        greeting += f'250 8BITMIME'
+        greeting = f"{greetCode} {softwareAndVersion} Service ready\r\n"
         greeting = greeting.encode(encoding="utf-8")
         return greeting
 
@@ -130,7 +129,10 @@ class ESMTPSession:
             self.SendError(errorCode=501, clientSocket=connSocket, localRset=True)
 
         else:
-            self.SendSuccess(successCode=250, clientSocket=connSocket)
+            response = f"250-{softwareAndVersion}\r\n"
+            response += f"250 8BITMIME\r\n"
+            connSocket.send(response.encode("utf-8"))
+            logger.debug(f'S: {response}')
             self.UpdateState(command=command)
 
     def MailCmdHandler(
@@ -410,7 +412,7 @@ class ESMTPSession:
                     
                     saved = store.storeMeta()
 
-                    if saved is None:
+                    if not saved:
                         logger.debug(f'Unauthorized user detected.:{self.mailTranscation[self.mailTranscationObjs[1]]}')
                         self.SendError(errorCode=550, clientSocket=connSocket,localRset=True)
                       
